@@ -183,7 +183,7 @@ def render(*args):
     settings(textures_dir)
 
     selected = pm.selected(type="transform")
-    names = [mesh.name() for mesh in selected]
+    names = [mesh.name().split("|")[-1] for mesh in selected]
     pm.showHidden(selected)
 
     if pm.checkBox("baker_id", q=True, v=True):
