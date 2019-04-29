@@ -26,8 +26,8 @@ import pymel.core.nodetypes as nt
 import maya.api.OpenMaya as om2
 
 
-material_dir = "D:/textures/materials"   # location with material textures
-textures_dir = "D:/textures/textures"    # location with AO, ID etc textures
+material_dir = "C:/textures/materials"   # location with material textures
+textures_dir = "C:/textures/textures"    # location with AO, ID etc textures
 redshift_dir = os.path.join(pm.workspace(fn=True), "images")
 size = 1024
 materials = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)
