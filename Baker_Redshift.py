@@ -1,6 +1,6 @@
 """
 place script, numpy and cv2.pyd into documents/maya/scripts.
-run python code: import Baker_Redshift;reload(Baker_Redshift)Baker_Redshift.ui();
+run python code: import Baker_Redshift;reload(Baker_Redshift);Baker_Redshift.ui();
 or simply execute via script editor
 
 edit next values according your needs
