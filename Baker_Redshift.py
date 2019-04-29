@@ -175,7 +175,7 @@ def render(*args):
     size = pm.intSliderGrp("baker_size", q=True, v=True)
     material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
     textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
-    redshift_dir = pm.textField("baker_red_dir", tx=True, q=True)
+    redshift_dir = os.path.join(pm.workspace(fn=True), "images")
 
     # setup directory and render
     if not os.path.exists(textures_dir):
