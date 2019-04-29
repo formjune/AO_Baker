@@ -1,6 +1,6 @@
 """
 place script, numpy and cv2.pyd into documents/maya/scripts.
-run python code: import Baker_Vray;BakerVray.ui();
+run python code: import Baker_Vray;reload(Baker_Vray)Baker_Vray.ui();
 or simply execute via script editor
 
 edit next values according your needs
