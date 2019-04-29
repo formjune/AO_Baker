@@ -241,9 +241,6 @@ def ui():
     pm.text("output directory", w=200)
     pm.textField("baker_out_dir", tx=textures_dir, w=200)
 
-    pm.text("redshift directory (look in bake prefs)", w=200)
-    pm.textField("baker_red_dir", tx=redshift_dir, w=200)
-
     pm.intSliderGrp("baker_size", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="size", field=True, v=size,
                     max=8192)
     pm.button("baker_uv", l="uv", w=200, c=applyUV)
