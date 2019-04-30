@@ -123,10 +123,9 @@ def bake(mesh, mesh_name):
 
     pm.rsRender(bake=True)
     old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
-    image = om2.MImage()
-    image.readFromFile(old_name)
-    image.writeToFile(os.path.join(textures_dir, mesh_name) + ".png", "png")
-
+    old_file = open(old_name, "rb").read()
+    open(mesh_name, "wb").write(old_file)
+    
 
 def bakeMaterials(mesh_name):
     """create material maps based on id"""
