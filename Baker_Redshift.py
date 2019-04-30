@@ -191,17 +191,32 @@ def render(*args):
         for mesh, mesh_name in zip(selected, names):
             bakeID(mesh, mesh_name + "_id")
 
-    if pm.checkBox("baker_ao", q=True, v=True):
-        pm.select(pm.ls(type="transform"))
-        pm.hyperShade(a="ao_material_rs")
-        for mesh, mesh_name in zip(selected, names):
-            bake(mesh, mesh_name + "_ao.png")
+    return_mat = {}
+    for color in materials:
+        color += "_id_material"
+        if not pm.objExists(color):
+            continue
+        pm.hyperShade(o=color)
+        return_mat[color] = pm.selected()
 
-    if pm.checkBox("baker_shadow", q=True, v=True):
-        pm.select(pm.ls(type="transform"))
-        pm.hyperShade(a="shadow_material_rs")
-        for mesh, mesh_name in zip(selected, names):
-            bake(mesh, mesh_name + "_shadow.png")
+    try:
+        if pm.checkBox("baker_ao", q=True, v=True):
+            pm.select(pm.ls(type="transform"))
+            pm.hyperShade(a="ao_material_rs")
+            for mesh, mesh_name in zip(selected, names):
+                bake(mesh, mesh_name + "_ao.png")
+
+        if pm.checkBox("baker_shadow", q=True, v=True):
+            pm.select(pm.ls(type="transform"))
+            pm.hyperShade(a="shadow_material_rs")
+            for mesh, mesh_name in zip(selected, names):
+                bake(mesh, mesh_name + "_shadow.png")
+    except Exception as e:
+        raise e
+    finally:
+        for color in return_mat:
+            pm.select(return_mat[color])
+            pm.hyperShade(a=color)
 
     if pm.checkBox("baker_mat", q=True, v=True):
         for mesh_name in names:

@@ -30,7 +30,8 @@ multiply_channels = "BaseColor",       # channels to multiply with AO and shadow
 
 
 # not for edit
-pm.loadPlugin("vrayformaya.mll")
+if not pm.pluginInfo("vrayformaya.mll", q=True, loaded=True):
+    pm.loadPlugin("vrayformaya.mll")
 material_node = collections.namedtuple("material", "file name channel")
 
 
@@ -44,7 +45,7 @@ def loadMaterials():
     return mt_nodes
 
 
-def settings(dirname):
+def settings():
     """setup vray before baking"""
     global size
     size = pm.intSliderGrp("baker_size", q=True, v=True)
@@ -52,14 +53,14 @@ def settings(dirname):
     pm.optionVar(intValue=("vrayBakeType", 2))
     pm.optionVar(intValue=("vraySkipNodesWithoutBakeOptions", 0))
     pm.optionVar(intValue=("vrayAssignBakedTextures", 0))
-    pm.optionVar(stringValue=("vrayBakeOutputPath", dirname))
+    pm.optionVar(stringValue=("vrayBakeOutputPath", textures_dir))
     pm.optionVar(intValue=("vrayBakeType", 2))
     try:
         options = nt.VRayBakeOptions("vrayDefaultBakeOptions")
     except pm.MayaNodeError:
         options = pm.createNode("VRayBakeOptions", n="vrayDefaultBakeOptions")
     options.setAttr("resolutionX", size)
-    options.setAttr("outputTexturePath", dirname, type="string")
+    options.setAttr("outputTexturePath", textures_dir, type="string")
     options.setAttr("filenamePrefix", "")
 
     # ao material
@@ -81,6 +82,7 @@ def settings(dirname):
 
 
 def bakeID(mesh, obj_name):
+    print mesh
     """bake id maps to 8bit"""
     mesh_2 = pm.duplicate(mesh)[0]
     pm.surfaceSampler(
@@ -180,9 +182,10 @@ def render(*args):
     if not os.path.exists(textures_dir):
         os.makedirs(textures_dir)
     os.chdir(textures_dir)
-    settings(textures_dir)
+    settings()
 
-    selected = pm.selected(type="transform")
+    selected = pm.selected(type="transform") or pm.ls(type="transform")
+    selected = [sl for sl in selected if sl.listRelatives(type="mesh")]
     names = [mesh.name().split("|")[-1] for mesh in selected]
     pm.showHidden(selected)
 
@@ -191,13 +194,13 @@ def render(*args):
             bakeID(mesh, mesh_name + "_id")
 
     if pm.checkBox("baker_ao", q=True, v=True):
-        pm.select(pm.ls(type="transform"))
+        pm.select(pm.ls(type="mesh"))
         pm.hyperShade(a="ao_material")
         for mesh, mesh_name in zip(selected, names):
             bake(mesh, mesh_name + "_ao.png")
 
     if pm.checkBox("baker_shadow", q=True, v=True):
-        pm.select(pm.ls(type="transform"))
+        pm.select(pm.ls(type="mesh"))
         pm.hyperShade(a="shadow_material")
         for mesh, mesh_name in zip(selected, names):
             bake(mesh, mesh_name + "_shadow.png")
@@ -232,14 +235,15 @@ def ui():
     if pm.window("Baker", ex=True):
         pm.deleteUI("Baker")
 
+    win = pm.window("Baker", wh=(200, 400), tlb=True, t="Vray baker")
+    pm.columnLayout()
+
     pm.text("material directory", w=200)
     pm.textField("baker_mat_dir", tx=material_dir, w=200)
 
     pm.text("output directory", w=200)
     pm.textField("baker_out_dir", tx=textures_dir, w=200)
 
-    win = pm.window("Baker", wh=(200, 400), tlb=True, t="Vray baker")
-    pm.columnLayout()
     pm.intSliderGrp("baker_size", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="size", field=True, v=size,
                     max=8192)
     pm.button("baker_uv", l="uv", w=200, c=applyUV)
@@ -258,6 +262,14 @@ def ui():
     pm.text(l="materials", w=200)
     for color in materials:
         pm.button(l=color, w=200, c=functools.partial(applyMaterial, color))
+
+    try:
+        options = nt.VRayBakeOptions("vrayDefaultBakeOptions")
+    except pm.MayaNodeError:
+        options = pm.createNode("VRayBakeOptions", n="vrayDefaultBakeOptions")
+    options.setAttr("resolutionX", size)
+    options.setAttr("outputTexturePath", textures_dir, type="string")
+    options.setAttr("filenamePrefix", "")
 
     win.show()
 
