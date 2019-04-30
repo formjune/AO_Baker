@@ -29,6 +29,7 @@ import maya.api.OpenMaya as om2
 material_dir = "C:/textures/materials"   # location with material textures
 textures_dir = "C:/textures/textures"    # location with AO, ID etc textures
 redshift_dir = os.path.join(pm.workspace(fn=True), "images")
+name_pattern = "%material_%channel"
 size = 1024
 materials = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)
              }
@@ -41,14 +42,33 @@ if not pm.pluginInfo("redshift4maya.mll", q=True, loaded=True):
 material_node = collections.namedtuple("material", "file name channel")
 
 
-def loadMaterials():
-    mt_nodes = []
-    for file_name in os.listdir(material_dir):
-        name, channel = os.path.splitext(file_name)[0].rsplit("_", 1)
-        file_name = os.path.join(material_dir, file_name)
-        mt_nodes.append(material_node(file_name, name, channel))
+def findNames():
+    """convert names into FileNode[]"""
+    def makeNode(full_path):
+        name = os.path.split(full_path)[1]
+        if not os.path.isfile(full_path):
+            return None
+        keys = os.path.splitext(name)[0].split("_")
+        print keys
+        try:
+            return material_node(full_path, keys[name_id] if name_id != -1 else "",
+                                 keys[channel_id] if channel_id != -1 else "")
+        except IndexError:
+            return None
 
-    return mt_nodes
+    sample = name_pattern
+    path = material_dir
+    split_sample = os.path.splitext(sample)[0].split("_")
+    name_id = split_sample.index("%material") if "%material" in split_sample else -1
+    channel_id = split_sample.index("%channel") if "%channel" in split_sample else -1
+
+    if os.path.isdir(path):
+        nodes = [makeNode(os.path.join(path, file_name)) for file_name in os.listdir(path)]
+    elif os.path.isfile(path):  # single file. return 2 nodes
+        nodes = [FileNode(path, "", "", ""), makeNode(path)]
+    else:   # no texture overlay
+        nodes = []
+    return [node for node in nodes if node is not None]
 
 
 def settings():
@@ -117,20 +137,20 @@ def bakeID(mesh, obj_name):
 
 def bake(mesh, mesh_name):
     """bake 0 - id, 1 - ao, 2 - shadows"""
-    pm.select(mesh)
     for rs_bake in os.listdir(redshift_dir):
         os.remove(os.path.join(redshift_dir, rs_bake))
 
+    pm.select(mesh)
     pm.rsRender(bake=True)
     old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
     old_file = open(old_name, "rb").read()
     open(mesh_name, "wb").write(old_file)
-    
+
 
 def bakeMaterials(mesh_name):
     """create material maps based on id"""
-    mat_list = loadMaterials()
-    mask_map = cv2.imread(os.path.join(textures_dir, mesh_name + "_id.png"))
+    mat_list = findNames()
+    mask_map = cv2.imread(os.path.join(textures_dir, mesh_name, mesh_name + "_id.png"))
     if mask_map is None:
         pm.warning(mesh_name + " id map doesn't exists")
         return
@@ -157,7 +177,7 @@ def bakeMaterials(mesh_name):
                 shadow_mask = cv2.cvtColor(cv2.cvtColor(shadow_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
                 channel_map = (channel_map * ao_mask * shadow_mask).astype(np.uint8)
 
-        cv2.imwrite(os.path.join(textures_dir, mesh_name + "_mat_" + channel + ".png"), channel_map)
+        cv2.imwrite(os.path.join(textures_dir, mesh_name, mesh_name + "_mat_" + channel + ".png"), channel_map)
 
 
 def findMask(image, rgb):
@@ -170,15 +190,13 @@ def findMask(image, rgb):
 
 
 def render(*args):
-    global size, material_dir, textures_dir, redshift_dir
+    global size, material_dir, textures_dir, redshift_dir, name_pattern
     size = pm.intSliderGrp("baker_size", q=True, v=True)
     material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
     textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
     redshift_dir = os.path.join(pm.workspace(fn=True), "images")
+    name_pattern = pm.textField("baker_pattern", tx=True, q=True)
 
-    # setup directory and render
-    #if not os.path.exists(textures_dir):
-    #    os.makedirs(textures_dir)
     os.chdir(textures_dir)
     settings()
 
@@ -187,25 +205,44 @@ def render(*args):
     names = [mesh.name().split("|")[-1] for mesh in selected]
     pm.showHidden(selected)
 
+    for mesh_name in names:
+        if not os.path.exists(mesh_name):
+            os.makedirs(mesh_name)
+
     if pm.checkBox("baker_id", q=True, v=True):
         for mesh, mesh_name in zip(selected, names):
+            os.chdir(os.path.join(textures_dir, mesh_name))
             bakeID(mesh, mesh_name + "_id")
+            os.chdir(textures_dir)
 
     if pm.checkBox("baker_ao", q=True, v=True):
         pm.select(pm.ls(type="mesh"))
-        pm.hyperShade(a="ao_material")
+        pm.hyperShade(a="ao_material_rs")
         for mesh, mesh_name in zip(selected, names):
+            os.chdir(os.path.join(textures_dir, mesh_name))
             bake(mesh, mesh_name + "_ao.png")
+            os.chdir(textures_dir)
 
     if pm.checkBox("baker_shadow", q=True, v=True):
         pm.select(pm.ls(type="mesh"))
-        pm.hyperShade(a="shadow_material")
+        pm.hyperShade(a="shadow_material_rs")
         for mesh, mesh_name in zip(selected, names):
+            os.chdir(os.path.join(textures_dir, mesh_name))
             bake(mesh, mesh_name + "_shadow.png")
+            os.chdir(textures_dir)
 
     if pm.checkBox("baker_mat", q=True, v=True):
         for mesh_name in names:
+            os.chdir(os.path.join(textures_dir, mesh_name))
             bakeMaterials(mesh_name)
+            os.chdir(textures_dir)
+
+    if pm.checkBox("baker_mesh", q=True, v=True):
+        for mesh, mesh_name in zip(selected, names):
+            pm.select(mesh)
+            cmds.file("%s/%s/%s.obj" % (textures_dir, mesh_name, mesh_name), force=True,
+                      options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1',
+                      type='OBJexport', es=True)
 
 
 def createFinal():
@@ -229,12 +266,21 @@ def applyUV(*args):
     pm.polyAutoProjection(lm=0, pb=0, ibd=1, cm=0, l=2, sc=1, o=1, p=6, ps=.2, ws=0)
 
 
+def multiImport(*args):
+    for f in pm.fileDialog2(ff="*.obj", fm=4):
+        cmds.file(f, i=True)
+
+
 def ui():
     if pm.window("Baker", ex=True):
         pm.deleteUI("Baker")
 
     win = pm.window("Baker", wh=(200, 400), tlb=True, t="redshift baker")
     pm.columnLayout()
+
+    pm.text("material name pattern", w=200)
+    pm.textField("baker_pattern", tx=name_pattern, w=200)
+
     pm.text("material directory", w=200)
     pm.textField("baker_mat_dir", tx=material_dir, w=200)
 
@@ -243,6 +289,7 @@ def ui():
 
     pm.intSliderGrp("baker_size", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="size", field=True, v=size,
                     max=8192)
+    pm.button(l="import meshes", c=multiImport, w=200)
     pm.button("baker_uv", l="uv", w=200, c=applyUV)
     pm.text(l="AO", w=200)
     pm.floatSliderGrp("baker_radius", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="spread", field=True, v=.8)
@@ -254,6 +301,7 @@ def ui():
     pm.checkBox("baker_ao", l="bake ao", v=True)
     pm.checkBox("baker_shadow", l="bake shadow", v=True)
     pm.checkBox("baker_mat", l="bake materials", v=True)
+    pm.checkBox("baker_mesh", l="save mesh", v=True)
     pm.text(h=30, l="")
     pm.button("baker_run", l="bake", w=200, c=render)
     pm.text(l="materials", w=200)
@@ -261,5 +309,6 @@ def ui():
         pm.button(l=color, w=200, c=functools.partial(applyMaterial, color))
 
     win.show()
+
 
 ui()
