@@ -36,7 +36,8 @@ multiply_channels = "BaseColor",
 
 
 # not for edit
-pm.loadPlugin("redshift4maya.mll")
+if not pm.pluginInfo("redshift4maya.mll", q=True, loaded=True):
+    pm.loadPlugin("redshift4maya.mll")
 material_node = collections.namedtuple("material", "file name channel")
 
 
@@ -50,7 +51,7 @@ def loadMaterials():
     return mt_nodes
 
 
-def settings(dirname):
+def settings():
     """setup vray before baking"""
 
     pm.optionVar(intValue=("redshiftBakeDefaultsHeight", size))
@@ -124,7 +125,7 @@ def bake(mesh, mesh_name):
     image = om2.MImage()
     image.readFromFile(old_name)
     image.writeToFile(os.path.join(textures_dir, mesh_name), "png")
-
+    
 
 def bakeMaterials(mesh_name):
     """create material maps based on id"""
@@ -169,8 +170,6 @@ def findMask(image, rgb):
 
 
 def render(*args):
-
-    # change build preferences
     global size, material_dir, textures_dir, redshift_dir
     size = pm.intSliderGrp("baker_size", q=True, v=True)
     material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
@@ -181,9 +180,10 @@ def render(*args):
     if not os.path.exists(textures_dir):
         os.makedirs(textures_dir)
     os.chdir(textures_dir)
-    settings(textures_dir)
+    settings()
 
-    selected = pm.selected(type="transform")
+    selected = pm.selected(type="transform") or pm.ls(type="transform")
+    selected = [sl for sl in selected if sl.listRelatives(type="mesh")]
     names = [mesh.name().split("|")[-1] for mesh in selected]
     pm.showHidden(selected)
 
@@ -191,32 +191,17 @@ def render(*args):
         for mesh, mesh_name in zip(selected, names):
             bakeID(mesh, mesh_name + "_id")
 
-    return_mat = {}
-    for color in materials:
-        color += "_id_material"
-        if not pm.objExists(color):
-            continue
-        pm.hyperShade(o=color)
-        return_mat[color] = pm.selected()
+    if pm.checkBox("baker_ao", q=True, v=True):
+        pm.select(pm.ls(type="mesh"))
+        pm.hyperShade(a="ao_material")
+        for mesh, mesh_name in zip(selected, names):
+            bake(mesh, mesh_name + "_ao.png")
 
-    try:
-        if pm.checkBox("baker_ao", q=True, v=True):
-            pm.select(pm.ls(type="transform"))
-            pm.hyperShade(a="ao_material_rs")
-            for mesh, mesh_name in zip(selected, names):
-                bake(mesh, mesh_name + "_ao.png")
-
-        if pm.checkBox("baker_shadow", q=True, v=True):
-            pm.select(pm.ls(type="transform"))
-            pm.hyperShade(a="shadow_material_rs")
-            for mesh, mesh_name in zip(selected, names):
-                bake(mesh, mesh_name + "_shadow.png")
-    except Exception as e:
-        raise e
-    finally:
-        for color in return_mat:
-            pm.select(return_mat[color])
-            pm.hyperShade(a=color)
+    if pm.checkBox("baker_shadow", q=True, v=True):
+        pm.select(pm.ls(type="mesh"))
+        pm.hyperShade(a="shadow_material")
+        for mesh, mesh_name in zip(selected, names):
+            bake(mesh, mesh_name + "_shadow.png")
 
     if pm.checkBox("baker_mat", q=True, v=True):
         for mesh_name in names:

@@ -22,8 +22,8 @@ import pymel.core as pm
 import pymel.core.nodetypes as nt
 
 
-material_dir = "D:/textures/materials"   # location with material textures
-textures_dir = "D:/textures/textures"    # location with AO, ID etc textures
+material_dir = "C:/textures/materials"   # location with material textures
+textures_dir = "C:/textures/textures"    # location with AO, ID etc textures
 size = 1024
 materials = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
 multiply_channels = "BaseColor",       # channels to multiply with AO and shadows
@@ -122,12 +122,13 @@ def bake(mesh, mesh_name):
 
     pm.select(mesh)
     pm.mel.eval("vrayStartBake();")
-    if os.path.exists(mesh_name):
-        os.remove(mesh_name)
+    image = om2.MImage()
+    image.readFromFile(os.path.join(textures_dir, old_name))
+    image.writeToFile(os.path.join(textures_dir, mesh_name), "png")
     try:
-        os.rename(old_name, mesh_name)
-    except OSError:
-        print old_name, mesh_name, "error"
+        os.remove(old_name)
+    except:
+        pass
 
 
 def bakeMaterials(mesh_name):
@@ -177,10 +178,8 @@ def render(*args):
     size = pm.intSliderGrp("baker_size", q=True, v=True)
     material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
     textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
+    redshift_dir = os.path.join(pm.workspace(fn=True), "images")
 
-    # setup directory and render
-    if not os.path.exists(textures_dir):
-        os.makedirs(textures_dir)
     os.chdir(textures_dir)
     settings()
 
@@ -208,6 +207,7 @@ def render(*args):
     if pm.checkBox("baker_mat", q=True, v=True):
         for mesh_name in names:
             bakeMaterials(mesh_name)
+    pm.warning("finished")
 
 
 def createFinal():
