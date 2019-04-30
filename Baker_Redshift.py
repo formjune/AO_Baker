@@ -59,6 +59,7 @@ def settings():
     pm.optionVar(intValue=("redshiftBakeDefaultsTileMode", 1))
     pm.optionVar(stringValue=("redshiftBakeDefaultsUvSet", "map1"))
     pm.optionVar(intValue=("redshiftBakeMode", 2))
+    pm.setAttr("redshiftOptions.imageFormat", 2)
 
     # ao material
     if not pm.objExists("ao_material_rs"):
@@ -118,14 +119,14 @@ def bake(mesh, mesh_name):
     """bake 0 - id, 1 - ao, 2 - shadows"""
     pm.select(mesh)
     for rs_bake in os.listdir(redshift_dir):
-        os.remove(os.path.join(redshift_dir, rs_bake))
+        shutil.rmtree(os.path.join(redshift_dir, rs_bake))
 
     pm.rsRender(bake=True)
     old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
     image = om2.MImage()
     image.readFromFile(old_name)
-    image.writeToFile(os.path.join(textures_dir, mesh_name), "png")
-    
+    image.writeToFile(os.path.join(textures_dir, mesh_name) + ".png", "png")
+
 
 def bakeMaterials(mesh_name):
     """create material maps based on id"""
@@ -177,8 +178,8 @@ def render(*args):
     redshift_dir = os.path.join(pm.workspace(fn=True), "images")
 
     # setup directory and render
-    if not os.path.exists(textures_dir):
-        os.makedirs(textures_dir)
+    #if not os.path.exists(textures_dir):
+    #    os.makedirs(textures_dir)
     os.chdir(textures_dir)
     settings()
 
