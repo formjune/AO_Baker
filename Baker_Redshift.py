@@ -119,7 +119,7 @@ def bake(mesh, mesh_name):
     """bake 0 - id, 1 - ao, 2 - shadows"""
     pm.select(mesh)
     for rs_bake in os.listdir(redshift_dir):
-        shutil.rmtree(os.path.join(redshift_dir, rs_bake))
+        os.remove(os.path.join(redshift_dir, rs_bake))
 
     pm.rsRender(bake=True)
     old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
