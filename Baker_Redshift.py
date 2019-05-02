@@ -211,6 +211,7 @@ def renderID(*args):
         pm.select(mesh)
         cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
                   options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+        pm.mel.eval("FBXExport -f \"%s.fbx\" -s" % mesh_full_name.replace("\\", "/"))
 
 
 def renderAO(*args):
@@ -311,10 +312,6 @@ def ui():
     pm.button("ao settings", w=200, c=lambda *args: preferences("ao_texture_rs", "ao_material_rs"))
     pm.button("shadow settings", w=200, c=lambda *args: preferences("shadow_material_rs"))
 
-    # pm.text(l="AO", w=200)
-    # pm.floatSliderGrp("baker_radius", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="spread", field=True, v=.8)
-    # pm.floatSliderGrp("baker_falloff", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="falloff", field=True, v=1)
-    # pm.floatSliderGrp("baker_sub", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="max dist", field=True, v=0)
     pm.text(l="bake", w=200)
 
     pm.button(l="bake id and mesh", w=200, c=renderID)
