@@ -199,6 +199,7 @@ def renderID(*args):
 
     settings()
     selected = pm.selected(type="transform") or getMeshes()
+    export = pm.optionMenu("baker_export", q=True, v=True)
     for mesh in selected:
         mesh_name = mesh.name()
         mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
@@ -209,10 +210,16 @@ def renderID(*args):
 
         bakeID(mesh, mesh_full_name + "_id")
         pm.select(mesh)
-        cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
-                  options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
-        pm.mel.eval("FBXExport -f \"%s.fbx\" -s" % mesh_full_name.replace("\\", "/"))
+        if export == "obj":
+            cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
+                      options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
 
+        elif export == "fbx":
+            pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
+        else:
+            pm.mel.FBXExportFileVersion(v="FBX201600")
+            pm.mel.FBXExportColladaTriangulate(True)
+            pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
 
 def renderAO(*args):
     """AO and SHADOW"""
@@ -314,6 +321,10 @@ def ui():
 
     pm.text(l="bake", w=200)
 
+    pm.optionMenu("baker_export", w=200)
+    pm.menuItem(label='obj')
+    pm.menuItem(label='fbx')
+    pm.menuItem(label='dae')
     pm.button(l="bake id and mesh", w=200, c=renderID)
     pm.checkBox("baker_ao", l="bake ao", v=True)
     pm.checkBox("baker_shadow", l="bake shadow", v=True)
