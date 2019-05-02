@@ -74,6 +74,13 @@ def findNames():
 def settings():
     """setup vray before baking"""
 
+    global size, material_dir, textures_dir, redshift_dir, name_pattern
+    size = pm.intSliderGrp("baker_size", q=True, v=True)
+    material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
+    textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
+    redshift_dir = os.path.join(pm.workspace(fn=True), "images")
+    name_pattern = pm.textField("baker_pattern", tx=True, q=True)
+
     if not pm.objExists("redshiftOptions"):
         pm.createNode("RedshiftOptions", n="redshiftOptions")
     pm.setAttr("redshiftOptions.imageFormat", 2)
@@ -95,13 +102,6 @@ def settings():
         material = pm.createNode("RedshiftMaterial", n="shadow_material_rs")
         material.setAttr("diffuse_color", (1, 1, 1))
 
-    # else:
-    #    texture = nt.DependNode("ao_texture_rs")
-    # texture.setAttr("spread", pm.floatSliderGrp("baker_radius", q=True, v=True))
-    # texture.setAttr("fallOff", pm.floatSliderGrp("baker_falloff", q=True, v=True))
-    # texture.setAttr("maxDistance", pm.floatSliderGrp("baker_sub", q=True, v=True))
-
-    # shadows catch material
 
 
 def bakeID(mesh, obj_name):
@@ -194,55 +194,54 @@ def findMask(image, rgb):
     return cv2.inRange(image, bottom, top)
 
 
-def render(*args):
-    global size, material_dir, textures_dir, redshift_dir, name_pattern
-    size = pm.intSliderGrp("baker_size", q=True, v=True)
-    material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
-    textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
-    redshift_dir = os.path.join(pm.workspace(fn=True), "images")
-    name_pattern = pm.textField("baker_pattern", tx=True, q=True)
+def renderID(*args):
+    """ID and save obj"""
 
     settings()
-
     selected = pm.selected(type="transform") or getMeshes()
-    all_meshes = getMeshes()
-    copy_meshes = [pm.duplicate(x, n=x.name() + "_copy")[0] for x in all_meshes]
-    pm.showHidden(copy_meshes)
-    pm.hide(all_meshes)
-    mat_list = findNames()
-
     for mesh in selected:
         mesh_name = mesh.name()
-        mesh_copy = nt.DependNode(mesh_name + "_copy")
         mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
         mesh_full_dir = os.path.join(textures_dir, mesh_name)
 
         if not os.path.exists(mesh_full_dir):
             os.makedirs(mesh_full_dir)
 
-        if pm.checkBox("baker_id", q=True, v=True):
-            bakeID(mesh, mesh_full_name + "_id")
+        bakeID(mesh, mesh_full_name + "_id")
+        pm.select(mesh)
+        cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
+                  options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+
+
+def renderAO(*args):
+    """AO and SHADOW"""
+
+    settings()
+    selected = pm.selected(type="transform") or getMeshes()
+    for mesh in selected:
+        mesh_name = mesh.name()
+        mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
 
         if pm.checkBox("baker_ao", v=True, q=True):
-            pm.select(copy_meshes)
+            pm.select(selected)
             pm.hyperShade(a="ao_material_rs")
-            bake(mesh_copy, mesh_full_name + "_ao.png")
+            bake(mesh, mesh_full_name + "_ao.png")
 
         if pm.checkBox("baker_shadow", v=True, q=True):
-            pm.select(copy_meshes)
+            pm.select(selected)
             pm.hyperShade(a="shadow_material_rs")
-            bake(mesh_copy, mesh_full_name + "_shadow.png")
+            bake(mesh, mesh_full_name + "_shadow.png")
 
-        if pm.checkBox("baker_mat", q=True, v=True):
-            bakeMaterials(mat_list, mesh_full_name)
 
-        if pm.checkBox("baker_mesh", q=True, v=True):
-            pm.select(mesh_copy)
-            cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
-                      options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+def renderMaterial(*args):
 
-    pm.showHidden(all_meshes)
-    pm.delete(copy_meshes)
+    settings()
+    selected = pm.selected(type="transform") or getMeshes()
+    mat_list = findNames()
+    for mesh in selected:
+        mesh_name = mesh.name()
+        mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+        bakeMaterials(mat_list, mesh_full_name)
 
 
 def applyMaterial(color, *args):
@@ -288,8 +287,6 @@ def preferences(*args):
 
 def ui():
 
-    settings()
-
     if pm.window("Baker", ex=True):
         pm.deleteUI("Baker")
 
@@ -320,17 +317,16 @@ def ui():
     # pm.floatSliderGrp("baker_sub", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="max dist", field=True, v=0)
     pm.text(l="bake", w=200)
 
-    pm.checkBox("baker_id", l="bake id", v=True)
+    pm.button(l="bake id and mesh", w=200, c=renderID)
     pm.checkBox("baker_ao", l="bake ao", v=True)
     pm.checkBox("baker_shadow", l="bake shadow", v=True)
-    pm.checkBox("baker_mat", l="bake materials", v=True)
-    pm.checkBox("baker_mesh", l="save mesh", v=True)
-    pm.text(h=30, l="")
-    pm.button("baker_run", l="bake", w=200, c=render)
+    pm.button(l="bake ao and shadow", w=200, c=renderAO)
+    pm.button(l="bake material", w=200, c=renderMaterial)
     pm.text(l="materials", w=200)
     for color in materials:
         pm.button(l=color, w=200, c=functools.partial(applyMaterial, color))
 
+    settings()
     win.show()
 
 
