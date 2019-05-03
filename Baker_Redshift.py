@@ -141,22 +141,29 @@ def bakeID(mesh, obj_name):
 def bake(mesh, mesh_name):
     """bake 0 - id, 1 - ao, 2 - shadows"""
     # clean and create new dir
-    print 2
     if not os.path.isdir(redshift_dir):
         os.makedirs(redshift_dir)
 
     for name in os.listdir(redshift_dir):
         name = os.path.join(redshift_dir, name)
-        print name
         if os.path.isfile(name):
             os.remove(name)
         else:
             shutil.rmtree(name)
 
+    if os.path.exists(mesh_name):
+        return 1
     pm.select(mesh)
     pm.rsRender(bake=True)
-    old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
-    open(mesh_name, "wb").write(open(old_name, "rb").read())
+    try:
+        old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
+        os.rename(old_name, mesh_name)
+        # open(mesh_name, "wb").write(open(old_name, "rb").read())
+        return 2
+    except IndexError:
+        return 0
+    except WindowsError:
+        return 1
 
 
 def bakeMaterials(mat_list, mesh_name):
@@ -209,7 +216,6 @@ def renderID(*args):
     settings()
     selected = pm.selected(type="transform") or getMeshes()
     selected.sort(key=lambda x: x.name())
-    export = pm.optionMenu("baker_export", q=True, v=True)
     applyMaterial("default")
 
     for mesh in selected:
@@ -221,17 +227,7 @@ def renderID(*args):
             os.makedirs(mesh_full_dir)
 
         bakeID(mesh, mesh_full_name + "_id")
-        pm.select(mesh)
-        if export == "obj":
-            cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
-                      options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
-
-        elif export == "fbx":
-            pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
-        else:
-            pm.mel.FBXExportFileVersion(v="FBX201600")
-            pm.mel.FBXExportColladaTriangulate(True)
-            pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
+        renderObj(mesh, mesh_full_name)
 
 
 def renderAO(*args):
@@ -240,7 +236,7 @@ def renderAO(*args):
     settings()
     selected = pm.selected(type="transform") or getMeshes()
     selected.sort(key=lambda x: x.name())
-    export = pm.optionMenu("baker_export", q=True, v=True)
+    data_print = []
 
     for mesh in selected:
         t = time.time()
@@ -253,30 +249,31 @@ def renderAO(*args):
         pm.select(mesh)
         pm.hyperShade(a="ao_material_rs")
         # if pm.checkBox("baker_ao", v=True, q=True):
-        bake(mesh, mesh_full_name + "_light.png")
+        result = bake(mesh, mesh_full_name + "_light.png")
+        data_print.append([mesh_name, result, time.time() - t])
 
-        print "%s ao: %s" % (mesh_name, time.time() - t)
-        t = time.time()
+        renderObj(mesh, mesh_full_name)
 
-        # if pm.checkBox("baker_shadow", v=True, q=True):
-        #     pm.select(mesh)
-        #     pm.hyperShade(a="shadow_material_rs")
-        #     bake(mesh, mesh_full_name + "_shadow.png")
+    data_print.sort(key=lambda x: x[1])
+    messsage = "failed", "skipped", "done"
+    for d in data_print:
+        d[1] = messsage[d[1]]
+        print d
 
-        print "%s shadow: %s" % (mesh_name, time.time() - t)
 
-        pm.select(mesh)
-        applyMaterial("default")
-        if export == "obj":
-            cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
-                      options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
-
-        elif export == "fbx":
-            pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
-        else:
-            pm.mel.FBXExportFileVersion(v="FBX201600")
-            pm.mel.FBXExportColladaTriangulate(True)
-            pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
+def renderObj(mesh, mesh_full_name):
+    export = pm.optionMenu("baker_export", q=True, v=True)
+    pm.select(mesh)
+    applyMaterial("default")
+    if export == "obj":
+        cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
+                  options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+    elif export == "fbx":
+        pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
+    else:
+        pm.mel.FBXExportFileVersion(v="FBX201600")
+        pm.mel.FBXExportColladaTriangulate(True)
+        pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
 
 
 def renderMaterial(*args):
