@@ -33,7 +33,7 @@ textures_dir = "C:/textures/textures"    # location with AO, ID etc textures
 redshift_dir = os.path.join(pm.workspace(fn=True), "images")
 name_pattern = "%material_%channel"
 size = 1024
-materials = {"red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
+materials = {"default": (128, 128, 128), "red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
 allowed_symbols = set(string.ascii_letters + string.digits + "_")
 multiply_channels = "BaseColor",
 
@@ -200,6 +200,8 @@ def renderID(*args):
     settings()
     selected = pm.selected(type="transform") or getMeshes()
     export = pm.optionMenu("baker_export", q=True, v=True)
+    applyMaterial("default")
+
     for mesh in selected:
         mesh_name = mesh.name()
         mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
@@ -221,11 +223,14 @@ def renderID(*args):
             pm.mel.FBXExportColladaTriangulate(True)
             pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
 
+
 def renderAO(*args):
     """AO and SHADOW"""
 
     settings()
     selected = pm.selected(type="transform") or getMeshes()
+    export = pm.optionMenu("baker_export", q=True, v=True)
+
     for mesh in selected:
         mesh_name = mesh.name()
         mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
@@ -239,6 +244,19 @@ def renderAO(*args):
             pm.select(selected)
             pm.hyperShade(a="shadow_material_rs")
             bake(mesh, mesh_full_name + "_shadow.png")
+
+        pm.select(mesh)
+        applyMaterial("default")
+        if export == "obj":
+            cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
+                      options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+
+        elif export == "fbx":
+            pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
+        else:
+            pm.mel.FBXExportFileVersion(v="FBX201600")
+            pm.mel.FBXExportColladaTriangulate(True)
+            pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
 
 
 def renderMaterial(*args):
@@ -336,6 +354,5 @@ def ui():
 
     settings()
     win.show()
-
 
 ui()

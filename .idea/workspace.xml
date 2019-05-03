@@ -2,6 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="c66acb1a-758e-4e2a-903b-4234818baf8f" name="Default Changelist" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Baker_Redshift.py" beforeDir="false" afterPath="$PROJECT_DIR$/Baker_Redshift.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -15,8 +16,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/Baker_Redshift.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="586">
-              <caret line="324" column="28" lean-forward="true" selection-end-line="340" selection-end-column="4" />
+            <state relative-caret-position="612">
+              <caret line="214" column="27" lean-forward="true" selection-end-line="357" selection-end-column="4" />
               <folding>
                 <element signature="e#898#907#0" expanded="true" />
               </folding>
@@ -54,6 +55,7 @@
       <foldersAlwaysOnTop value="true" />
     </navigator>
     <panes>
+      <pane id="Scope" />
       <pane id="ProjectPane">
         <subPane>
           <expand>
@@ -65,7 +67,6 @@
           <select />
         </subPane>
       </pane>
-      <pane id="Scope" />
     </panes>
   </component>
   <component name="RunDashboard">
@@ -122,8 +123,8 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/Baker_Redshift.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="586">
-          <caret line="324" column="28" lean-forward="true" selection-end-line="340" selection-end-column="4" />
+        <state relative-caret-position="612">
+          <caret line="214" column="27" lean-forward="true" selection-end-line="357" selection-end-column="4" />
           <folding>
             <element signature="e#898#907#0" expanded="true" />
           </folding>
