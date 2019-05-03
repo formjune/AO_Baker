@@ -26,6 +26,7 @@ import pymel.core.nodetypes as nt
 import shutil
 import string
 import maya.cmds as cmds
+import time
 
 
 material_dir = "C:/textures/materials"   # location with material textures
@@ -93,15 +94,14 @@ def settings():
     # ao material
     if not pm.objExists("ao_material_rs"):
         material = pm.createNode("RedshiftMaterial", n="ao_material_rs")
-        material.setAttr("emission_weight", 1)
+        # material.setAttr("emission_weight", 1)
         texture = pm.createNode("RedshiftAmbientOcclusion", n="ao_texture_rs")
-        texture.connectAttr("outColor", material.attr("diffuse_color"))
-        texture.connectAttr("outColor", material.attr("emission_color"))
+        texture.connectAttr("outColor", material.attr("color"))
+        # texture.connectAttr("outColor", material.attr("emission_color"))
 
     if not pm.objExists("shadow_material_rs"):
         material = pm.createNode("RedshiftMaterial", n="shadow_material_rs")
         material.setAttr("diffuse_color", (1, 1, 1))
-
 
 
 def bakeID(mesh, obj_name):
@@ -141,8 +141,17 @@ def bakeID(mesh, obj_name):
 def bake(mesh, mesh_name):
     """bake 0 - id, 1 - ao, 2 - shadows"""
     # clean and create new dir
-    shutil.rmtree(redshift_dir, ignore_errors=True)
-    os.makedirs(redshift_dir)
+    print 2
+    if not os.path.isdir(redshift_dir):
+        os.makedirs(redshift_dir)
+
+    for name in os.listdir(redshift_dir):
+        name = os.path.join(redshift_dir, name)
+        print name
+        if os.path.isfile(name):
+            os.remove(name)
+        else:
+            shutil.rmtree(name)
 
     pm.select(mesh)
     pm.rsRender(bake=True)
@@ -199,6 +208,7 @@ def renderID(*args):
 
     settings()
     selected = pm.selected(type="transform") or getMeshes()
+    selected.sort(key=lambda x: x.name())
     export = pm.optionMenu("baker_export", q=True, v=True)
     applyMaterial("default")
 
@@ -229,21 +239,31 @@ def renderAO(*args):
 
     settings()
     selected = pm.selected(type="transform") or getMeshes()
+    selected.sort(key=lambda x: x.name())
     export = pm.optionMenu("baker_export", q=True, v=True)
 
     for mesh in selected:
+        t = time.time()
         mesh_name = mesh.name()
         mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+        mesh_full_dir = os.path.join(textures_dir, mesh_name)
+        if not os.path.exists(mesh_full_dir):
+            os.makedirs(mesh_full_dir)
 
-        if pm.checkBox("baker_ao", v=True, q=True):
-            pm.select(selected)
-            pm.hyperShade(a="ao_material_rs")
-            bake(mesh, mesh_full_name + "_ao.png")
+        pm.select(mesh)
+        pm.hyperShade(a="ao_material_rs")
+        # if pm.checkBox("baker_ao", v=True, q=True):
+        bake(mesh, mesh_full_name + "_light.png")
 
-        if pm.checkBox("baker_shadow", v=True, q=True):
-            pm.select(selected)
-            pm.hyperShade(a="shadow_material_rs")
-            bake(mesh, mesh_full_name + "_shadow.png")
+        print "%s ao: %s" % (mesh_name, time.time() - t)
+        t = time.time()
+
+        # if pm.checkBox("baker_shadow", v=True, q=True):
+        #     pm.select(mesh)
+        #     pm.hyperShade(a="shadow_material_rs")
+        #     bake(mesh, mesh_full_name + "_shadow.png")
+
+        print "%s shadow: %s" % (mesh_name, time.time() - t)
 
         pm.select(mesh)
         applyMaterial("default")
@@ -263,10 +283,15 @@ def renderMaterial(*args):
 
     settings()
     selected = pm.selected(type="transform") or getMeshes()
+    selected.sort(key=lambda x: x.name())
     mat_list = findNames()
     for mesh in selected:
         mesh_name = mesh.name()
         mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+        mesh_full_dir = os.path.join(textures_dir, mesh_name)
+        if not os.path.exists(mesh_full_dir):
+            os.makedirs(mesh_full_dir)
+
         bakeMaterials(mat_list, mesh_full_name)
 
 

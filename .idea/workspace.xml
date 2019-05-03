@@ -16,8 +16,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/Baker_Redshift.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="612">
-              <caret line="214" column="27" lean-forward="true" selection-end-line="357" selection-end-column="4" />
+            <state relative-caret-position="343">
+              <caret line="255" column="43" selection-end-line="382" selection-end-column="4" />
               <folding>
                 <element signature="e#898#907#0" expanded="true" />
               </folding>
@@ -32,6 +32,10 @@
       <find>collectio</find>
       <find>getMeshes</find>
       <find>cmds.file</find>
+      <find>shutil</find>
+      <find>bakeID</find>
+      <find>redshift</find>
+      <find>pm.select</find>
     </findStrings>
   </component>
   <component name="Git.Settings">
@@ -96,7 +100,6 @@
   </component>
   <component name="ToolWindowManager">
     <frame x="0" y="0" width="1920" height="1080" extended-state="6" />
-    <editor active="true" />
     <layout>
       <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.24973656" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
@@ -123,8 +126,8 @@
   <component name="editorHistoryManager">
     <entry file="file://$PROJECT_DIR$/Baker_Redshift.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="612">
-          <caret line="214" column="27" lean-forward="true" selection-end-line="357" selection-end-column="4" />
+        <state relative-caret-position="343">
+          <caret line="255" column="43" selection-end-line="382" selection-end-column="4" />
           <folding>
             <element signature="e#898#907#0" expanded="true" />
           </folding>
