@@ -1,18 +1,13 @@
 """
 place script, numpy and cv2.pyd into documents/maya/scripts.
-run python code: import Baker_Redshift;reload(Baker_Redshift);Baker_Redshift.ui();
-or simply execute via script editor
+run python code: import Baker_Redshift;reload(Baker_Redshift);
 
-edit next values according your needs
-material_dir - root folder containing all material like $material_$channel.png. no recursive search
-redshift_dir - scan directory where redshift saves files. Check in redshift -> baking -> bake
-Will be cleared after every bake. by default it's project/images
-
-textures_dir - directory where all textures will be stored (ID, AO, shadows, material)
-size - size of output textures, can be changed via gui
-materials - dictionary like {$material: (R, G, B)} all colors must be within [0, 255] range.
-not registered materials will be skipped.
-multiply_channels = list of $channel to be multiplied with AO and shadows. resulting texture are calculated AO * shadows * %channel
+material_dir = directory with materials to place
+output_dir = directory where all textures will be stored
+name_pattern = pattern for material textures recognition
+size = size of output textures
+multiply_channels = which channels will be multiplied with AO and SHADOWS
+materials = ID colors. key - material name, value - RGB color for mask
 """
 
 
