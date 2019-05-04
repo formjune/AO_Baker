@@ -25,93 +25,177 @@ import pymel.core as pm
 import pymel.core.nodetypes as nt
 import shutil
 import string
-import maya.cmds as cmds
 import time
 
 
-material_dir = "C:/textures/materials"   # location with material textures
-textures_dir = "C:/textures/textures"    # location with AO, ID etc textures
-redshift_dir = os.path.join(pm.workspace(fn=True), "images")
-name_pattern = "%material_%channel"
-size = 1024
-materials = {"default": (128, 128, 128), "red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
-allowed_symbols = set(string.ascii_letters + string.digits + "_")
-multiply_channels = "BaseColor",
-ignore_existing = True
-level_auto = True
+class Default(object):
+    """default preferences"""
+
+    material_dir = "C:/textures/materials"   # location with material textures
+    output_dir = "C:/textures/textures"    # location with AO, ID etc textures
+    name_pattern = "%material_%channel"
+    size = 1024
+    multiply_channels = "BaseColor",
+    materials = {"default": (255, 255, 255), "red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
 
 
 # not for edit
 if not pm.pluginInfo("redshift4maya.mll", q=True, loaded=True):
     pm.loadPlugin("redshift4maya.mll")
 material_node = collections.namedtuple("material", "file name channel")
+allowed_symbols = set(string.ascii_letters + string.digits + "_")
 
 
-def findNames():
-    """convert names into FileNode[]"""
-    def makeNode(full_path):
-        name = os.path.split(full_path)[1]
-        if not os.path.isfile(full_path):
-            return None
-        keys = os.path.splitext(name)[0].split("_")
-        print keys
-        try:
-            return material_node(full_path, keys[name_id] if name_id != -1 else "",
-                                 keys[channel_id] if channel_id != -1 else "")
-        except IndexError:
-            return None
-
-    sample = name_pattern
-    path = material_dir
-    split_sample = os.path.splitext(sample)[0].split("_")
-    name_id = split_sample.index("%material") if "%material" in split_sample else -1
-    channel_id = split_sample.index("%channel") if "%channel" in split_sample else -1
-
-    if os.path.isdir(path):
-        nodes = [makeNode(os.path.join(path, file_name)) for file_name in os.listdir(path)]
-        return [node for node in nodes if node is not None]
-    else:
-        return []
+def applyMaterial(color, *args):
+    """apply id material to selected"""
+    try:
+        material = nt.Lambert(color + "_id")
+    except pm.MayaNodeError:
+        selected = pm.selected()
+        material = pm.createNode("lambert", n=color + "_id_material")  # vray node
+        color = [c / 255. for c in Default.materials[color]]
+        material.setAttr("color", color)
+        pm.select(selected)
+    pm.hyperShade(a=material)
 
 
-def settings():
-    """setup vray before baking"""
-
-    global size, material_dir, textures_dir, redshift_dir, name_pattern, ignore_existing, level_auto
-    size = pm.intSliderGrp("baker_size", q=True, v=True)
-    material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
-    textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
-    redshift_dir = os.path.join(pm.workspace(fn=True), "images")
-    name_pattern = pm.textField("baker_pattern", tx=True, q=True)
-    ignore_existing = pm.checkBox("baker_ignore_existing", q=True, v=True)
-    level_auto = pm.checkBox("baker_auto", q=True, v=True)
-
-    if not pm.objExists("redshiftOptions"):
-        pm.createNode("RedshiftOptions", n="redshiftOptions")
-    pm.setAttr("redshiftOptions.imageFormat", 2)
-    pm.optionVar(intValue=("redshiftBakeDefaultsHeight", size))
-    pm.optionVar(intValue=("redshiftBakeDefaultsWidth", size))
-    pm.optionVar(intValue=("redshiftBakeDefaultsTileMode", 1))
-    pm.optionVar(stringValue=("redshiftBakeDefaultsUvSet", "map1"))
-    pm.optionVar(intValue=("redshiftBakeMode", 2))
-
-    # ao material
-    if not pm.objExists("ao_material_rs"):
-        material = pm.createNode("RedshiftMaterial", n="ao_material_rs")
-        # material.setAttr("emission_weight", 1)
-        texture = pm.createNode("RedshiftAmbientOcclusion", n="ao_texture_rs")
-        texture.connectAttr("outColor", material.attr("diffuse_color"))
-        # texture.connectAttr("outColor", material.attr("emission_color"))
-
-    # if not pm.objExists("shadow_material_rs"):
-    #     material = pm.createNode("RedshiftMaterial", n="shadow_material_rs")
-    #     material.setAttr("diffuse_color", (1, 1, 1))
+def applyUV(*args):
+    pm.polyAutoProjection(lm=0, pb=0, ibd=1, cm=0, l=2, sc=1, o=1, p=6, ps=.2, ws=0)
 
 
-def bakeID(mesh, obj_name):
-    """bake id maps to 8bit"""
-    mesh_2 = pm.duplicate(mesh)[0]
-    pm.surfaceSampler(
+def multiImport(*args):
+    for f in pm.fileDialog2(ff="*.obj", fm=4):
+        pm.cmds.file(f, i=True)
+
+
+def getMeshes():
+    return [x for x in pm.ls(type="transform") if x.listRelatives(type="mesh")]
+
+
+def findMask(image, rgb):
+    """convert texture to mask. args (np.array, (r, g, b))"""
+    def minMax(color):
+        return min(255, max(color, 0))
+    top = np.array([minMax(rgb[2] + 4), minMax(rgb[1] + 4), minMax(rgb[0] + 4)], dtype=np.uint8)
+    bottom = np.array([minMax(rgb[2] - 4), minMax(rgb[1] - 4), minMax(rgb[0] - 4)], dtype=np.uint8)
+    return cv2.inRange(image, bottom, top)
+
+
+def checkNames(*args):
+    for mesh in getMeshes():
+        for letter in mesh.name():
+            try:
+                assert letter in allowed_symbols
+            except AssertionError:
+                pm.warning("incorrect name: %s, character: '%s'" % (mesh.name(), letter))
+
+
+def preferences(*args):
+    pm.select(args)
+    pm.mel.eval("AttributeEditor;")
+
+
+class Baker(object):
+
+    def __init__(self):
+
+        if pm.window("Baker", ex=True):
+            pm.deleteUI("Baker")
+        win = pm.window("Baker", wh=(200, 540), tlb=True, t="redshift baker")
+        pm.columnLayout()
+
+        pm.text(label="material directory", w=200)
+        self.mat_folder = pm.textField(tx=Default.material_dir, w=200)
+        pm.text(label="output directory", w=200)
+        self.out_folder = pm.textField(tx=Default.output_dir, w=200)
+        pm.text(label="material name pattern")
+        self.pattern = pm.textField(tx=Default.name_pattern, w=200)
+        self.size = pm.intSliderGrp(cw3=[30, 50, 110], ct3=["left", "left", "lfet"], label="size", field=True,
+                                    v=Default.size, max=8192)
+        pm.button(label="import meshes", c=multiImport, w=200)
+        pm.button(label="check names", c=checkNames, w=200)
+        pm.button(label="create uv", w=200, c=applyUV)
+        pm.button(label="render settings", w=200, c=lambda *args: preferences("redshiftOptions"))
+        pm.button(label="AO shader settings", w=200,
+                  c=lambda *args: preferences("ao_texture", "ao_material"))
+        pm.button(label="shadow shader settings", w=200, c=lambda *args: preferences("shadow_material"))
+        self.format = pm.optionMenu(w=200)
+        pm.menuItem(label='obj')
+        pm.menuItem(label='fbx')
+        pm.menuItem(label='dae')
+        self.default_mat = pm.checkBox(label="default material for ID", v=True)
+        self.auto_levels = pm.checkBox(label="auto levels for shadows", v=False)
+        self.ignore_exist = pm.checkBox(label="ignore existence", v=True)
+        self.shadow = pm.checkBox(label="bake shadows", v=True)
+        self.ao = pm.checkBox(label="bake ambient occlusion", v=True)
+
+        pm.button(label="bake id and mesh", w=200, c=self.renderID)
+        pm.button(label="bake AO and shadow", w=200, c=self.renderAO)
+        pm.button(label="create material", w=200, c=self.renderMaterial)
+
+        pm.text(l="materials", w=200)
+        for color in Default.materials:
+            pm.button(label=color, w=200, c=functools.partial(applyMaterial, color))
+
+        self.settings()
+        win.show()
+
+    def settings(self):
+        """setup vray before baking"""
+
+        if not pm.objExists("redshiftOptions"):
+            pm.createNode("RedshiftOptions", n="redshiftOptions")
+        pm.setAttr("redshiftOptions.imageFormat", 2)
+        pm.optionVar(intValue=("redshiftBakeDefaultsHeight", self.size.getValue()))
+        pm.optionVar(intValue=("redshiftBakeDefaultsWidth", self.size.getValue()))
+        pm.optionVar(intValue=("redshiftBakeDefaultsTileMode", 1))
+        pm.optionVar(stringValue=("redshiftBakeDefaultsUvSet", "map1"))
+        pm.optionVar(intValue=("redshiftBakeMode", 2))
+
+        # ao material
+        if not pm.objExists("ao_material"):
+            material = pm.createNode("RedshiftMaterial", n="ao_material")
+            material.setAttr("emission_weight", 2)
+            material.setAttr("overall_color", (0, 0, 0))
+            texture = pm.createNode("RedshiftAmbientOcclusion", n="ao_texture")
+            texture.connectAttr("outColor", material.attr("diffuse_color"))
+            texture.connectAttr("outColor", material.attr("emission_color"))
+
+        if not pm.objExists("shadow_material"):
+            material = pm.createNode("RedshiftMaterial", n="shadow_material")
+            material.setAttr("diffuse_color", (1, 1, 1))
+
+    def findNames(self):
+        """convert names into FileNode[]"""
+
+        def makeNode(full_path):
+            name = os.path.split(full_path)[1]
+            if not os.path.isfile(full_path):
+                return None
+            keys = os.path.splitext(name)[0].split("_")
+            try:
+                return material_node(full_path, keys[name_id] if name_id != -1 else "",
+                                     keys[channel_id] if channel_id != -1 else "")
+            except IndexError:
+                return None
+
+        sample = self.pattern.getText()
+        path = self.mat_folder.getText()
+        print path, sample
+        split_sample = os.path.splitext(sample)[0].split("_")
+        name_id = split_sample.index("%material") if "%material" in split_sample else -1
+        channel_id = split_sample.index("%channel") if "%channel" in split_sample else -1
+
+        if os.path.isdir(path):
+            nodes = [makeNode(os.path.join(path, file_name)) for file_name in os.listdir(path)]
+            return [node for node in nodes if node is not None]
+        else:
+            return []
+
+    def bakeID(self, mesh, obj_name):
+        """bake id maps to 8bit"""
+        mesh_2 = pm.duplicate(mesh)[0]
+        pm.surfaceSampler(
             fileFormat="png",
             filename=obj_name,
             filterSize=0,
@@ -119,8 +203,8 @@ def bakeID(mesh, obj_name):
             flipU=0,
             flipV=0,
             ignoreMirroredFaces=0,
-            mapHeight=size,
-            mapWidth=size,
+            mapHeight=self.size.getValue(),
+            mapWidth=self.size.getValue(),
             mapMaterials=1,
             mapOutput="diffuseRGB",
             mapSpace="tangent",
@@ -139,34 +223,31 @@ def bakeID(mesh, obj_name):
             useGeometryNormals=0,
             uvSet="map1"
         )
-    pm.delete(mesh_2)
+        pm.delete(mesh_2)
 
+    def bakeAO(self, mesh, mesh_name, autolevel=False):
+        """bake 0 - id, 1 - ao, 2 - shadows"""
+        # clean and create new dir
+        redshift_dir = os.path.join(pm.workspace(fn=True), "images")
+        if not os.path.isdir(redshift_dir):
+            os.makedirs(redshift_dir)
 
-def bake(mesh, mesh_name):
-    """bake 0 - id, 1 - ao, 2 - shadows"""
-    # clean and create new dir
-    if not os.path.isdir(redshift_dir):
-        os.makedirs(redshift_dir)
+        for name in os.listdir(redshift_dir):
+            name = os.path.join(redshift_dir, name)
+            if os.path.isfile(name):
+                os.remove(name)
+            else:
+                shutil.rmtree(name)
 
-    for name in os.listdir(redshift_dir):
-        name = os.path.join(redshift_dir, name)
-        if os.path.isfile(name):
-            os.remove(name)
-        else:
-            shutil.rmtree(name)
+        if os.path.exists(mesh_name) and not self.ignore_exist.getValue():
+            return 1
 
-    if os.path.exists(mesh_name) and not ignore_existing:
-        return 1
-    pm.select(mesh)
-    pm.rsRender(bake=True)
-    try:
+        pm.select(mesh)
+        pm.rsRender(bake=True)
         old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
-        if ignore_existing:
-            open(mesh_name, "wb").write(open(old_name, "rb").read())
-        else:
-            os.rename(old_name, mesh_name)
+        open(mesh_name, "wb").write(open(old_name, "rb").read())
 
-        if level_auto:
+        if autolevel:
             array = cv2.imread(mesh_name)
             ar = array.flatten()
             min_v = min(ar)
@@ -175,222 +256,135 @@ def bake(mesh, mesh_name):
             array = array.astype(np.uint8)
             cv2.imwrite(mesh_name, array)
 
-        return 2
-    except IndexError:
         return 0
-    except WindowsError:
-        return 1
 
+    def bakeMaterials(self, mat_list, mesh_name):
+        """create material maps based on id"""
 
-def bakeMaterials(mat_list, mesh_name):
-    """create material maps based on id"""
+        mask_map = cv2.imread(mesh_name + "_id.png")
+        if mask_map is None:
+            pm.warning(mesh_name + " id map doesn't exists")
+            return
 
-    mask_map = cv2.imread(mesh_name + "_id.png")
-    if mask_map is None:
-        pm.warning(mesh_name + " id map doesn't exists")
-        return
+        size = self.size.getValue()
+        mask_map = cv2.resize(mask_map, (size, size))
+        for channel in {ch.channel for ch in mat_list}:
+            channel_map = np.zeros((size, size, 3), dtype=np.uint8)  # create empty channel
 
-    mask_map = cv2.resize(mask_map, (size, size))
-    for channel in {ch.channel for ch in mat_list}:
-        channel_map = np.zeros((size, size, 3), dtype=np.uint8)  # create empty channel
+            for color in Default.materials:
+                found = [mt for mt in mat_list if mt.name == color and mt.channel == channel]
+                if not found:
+                    pm.warning("%s_%s doesn't exists" % (color, channel))
+                    continue
+                image_file = cv2.resize(cv2.imread(found[0].file), (size, size))
+                color_mask = findMask(mask_map, Default.materials[color])
+                channel_map |= cv2.bitwise_or(image_file, image_file, mask=color_mask)
 
-        for color in materials:
-            found = [mt for mt in mat_list if mt.name == color and mt.channel == channel]
-            if not found:
-                pm.warning("%s_%s doesn't exists" % (color, channel))
-                continue
-            image_file = cv2.resize(cv2.imread(found[0].file), (size, size))
-            color_mask = findMask(mask_map, materials[color])
-            channel_map |= cv2.bitwise_or(image_file, image_file, mask=color_mask)
+            # multiply
+            if channel in Default.multiply_channels:
+                ao_mask = cv2.imread(mesh_name + "_ao.png")
+                if ao_mask is not None:
+                    ao_mask = cv2.resize(ao_mask, (size, size))
+                    ao_mask = cv2.cvtColor(cv2.cvtColor(ao_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
+                    channel_map *= ao_mask
 
-        # multiply
-        if channel in multiply_channels:
-            ao_mask = cv2.imread(mesh_name + "_light.png")
-            # shadow_mask = cv2.imread(mesh_name + "_shadow.png")
-            if ao_mask is not None:
-                ao_mask = cv2.resize(ao_mask, (size, size))
-                # shadow_mask = cv2.resize(shadow_mask, (size, size))
-                ao_mask = cv2.cvtColor(cv2.cvtColor(ao_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
-                # shadow_mask = cv2.cvtColor(cv2.cvtColor(shadow_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
-                channel_map = (channel_map * ao_mask).astype(np.uint8)
+                shadow_mask = cv2.imread(mesh_name + "_shadow.png")
+                if shadow_mask is not None:
+                    shadow_mask = cv2.resize(shadow_mask, (size, size))
+                    shadow_mask = cv2.cvtColor(cv2.cvtColor(shadow_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
+                    channel_map *= shadow_mask
 
-        cv2.imwrite("%s_mat_%s.png" % (mesh_name, channel), channel_map)
+            cv2.imwrite("%s_mat_%s.png" % (mesh_name, channel), channel_map.astype(np.uint8))
 
-
-def findMask(image, rgb):
-    """convert texture to mask. args (np.array, (r, g, b))"""
-    def minMax(color):
-        return min(255, max(color, 0))
-    top = np.array([minMax(rgb[2] + 4), minMax(rgb[1] + 4), minMax(rgb[0] + 4)], dtype=np.uint8)
-    bottom = np.array([minMax(rgb[2] - 4), minMax(rgb[1] - 4), minMax(rgb[0] - 4)], dtype=np.uint8)
-    return cv2.inRange(image, bottom, top)
-
-
-def renderID(*args):
-    """ID and save obj"""
-
-    settings()
-    selected = pm.selected(type="transform") or getMeshes()
-    selected.sort(key=lambda x: x.name())
-    applyMaterial("default")
-
-    for mesh in selected:
-        mesh_name = mesh.name()
-        mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
-        mesh_full_dir = os.path.join(textures_dir, mesh_name)
-
-        if not os.path.exists(mesh_full_dir):
-            os.makedirs(mesh_full_dir)
-
-        bakeID(mesh, mesh_full_name + "_id")
-        renderObj(mesh, mesh_full_name)
-
-
-def renderAO(*args):
-    """AO and SHADOW"""
-
-    settings()
-    selected = pm.selected(type="transform") or getMeshes()
-    selected.sort(key=lambda x: x.name())
-    data_print = []
-
-    for mesh in selected:
-        t = time.time()
-        mesh_name = mesh.name()
-        mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
-        mesh_full_dir = os.path.join(textures_dir, mesh_name)
-        if not os.path.exists(mesh_full_dir):
-            os.makedirs(mesh_full_dir)
-
+    def renderObj(self, mesh, mesh_full_name):
+        export = self.format.getValue()
         pm.select(mesh)
-        pm.hyperShade(a="ao_material_rs")
-        # if pm.checkBox("baker_ao", v=True, q=True):
-        result = bake(mesh, mesh_full_name + "_light.png")
-        data_print.append([mesh_name, result, time.time() - t])
+        applyMaterial("default")
+        if export == "obj":
+            pm.cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
+                         options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+        elif export == "fbx":
+            pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
+        else:
+            pm.mel.FBXExportFileVersion(v="FBX201600")
+            pm.mel.FBXExportColladaTriangulate(True)
+            pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
 
-        renderObj(mesh, mesh_full_name)
+    def renderID(self, *args):
+        """ID and save obj"""
 
-    data_print.sort(key=lambda x: x[1])
-    messsage = "failed", "skipped", "done"
-    for d in data_print:
-        d[1] = messsage[d[1]]
-        print d
+        self.settings()
+        selected = pm.selected(type="transform") or getMeshes()
+        selected.sort(key=lambda x: x.name())
+        if self.default_mat.getValue():
+            pm.select(selected)
+            applyMaterial("default")
+        textures_dir = self.out_folder.getText()
 
+        for mesh in selected:
+            mesh_name = mesh.name()
+            mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+            mesh_full_dir = os.path.join(textures_dir, mesh_name)
 
-def renderObj(mesh, mesh_full_name):
-    export = pm.optionMenu("baker_export", q=True, v=True)
-    pm.select(mesh)
-    applyMaterial("default")
-    if export == "obj":
-        cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
-                  options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
-    elif export == "fbx":
-        pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
-    else:
-        pm.mel.FBXExportFileVersion(v="FBX201600")
-        pm.mel.FBXExportColladaTriangulate(True)
-        pm.mel.FBXExport(s=True, f=mesh_full_name.replace("\\", "/") + ".dae", caller="FBXDAEMayaTranslator")
+            if not os.path.exists(mesh_full_dir):
+                os.makedirs(mesh_full_dir)
 
+            self.bakeID(mesh, mesh_full_name + "_id")
+            self.renderObj(mesh, mesh_full_name)
 
-def renderMaterial(*args):
+    def renderAO(self, *args):
+        """AO and SHADOW"""
 
-    settings()
-    selected = pm.selected(type="transform") or getMeshes()
-    selected.sort(key=lambda x: x.name())
-    mat_list = findNames()
-    for mesh in selected:
-        mesh_name = mesh.name()
-        mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
-        mesh_full_dir = os.path.join(textures_dir, mesh_name)
-        if not os.path.exists(mesh_full_dir):
-            os.makedirs(mesh_full_dir)
+        self.settings()
+        selected = pm.selected(type="transform") or getMeshes()
+        selected.sort(key=lambda x: x.name())
+        data_print = []
+        textures_dir = self.out_folder.getText()
 
-        bakeMaterials(mat_list, mesh_full_name)
+        for mesh in selected:
 
+            mesh_name = mesh.name()
+            mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+            mesh_full_dir = os.path.join(textures_dir, mesh_name)
+            if not os.path.exists(mesh_full_dir):
+                os.makedirs(mesh_full_dir)
 
-def applyMaterial(color, *args):
-    """apply id material to selected"""
-    try:
-        material = nt.Lambert(color + "_id")
-    except pm.MayaNodeError:
-        selected = pm.selected()
-        material = pm.createNode("lambert", n=color + "_id_material")  # vray node
-        color = [c / 255. for c in materials[color]]
-        material.setAttr("color", color)
-        pm.select(selected)
-    pm.hyperShade(a=material)
+            if self.ao.getValue():
+                t = time.time()
+                pm.select(mesh)
+                pm.hyperShade(a="ao_material")
+                result = self.bakeAO(mesh, mesh_full_name + "_ao.png")
+                data_print.append([mesh_name + "_ao", result, time.time() - t])
 
+            if self.shadow.getValue():
+                t = time.time()
+                pm.select(selected)
+                pm.hyperShade(a="shadow_material")
+                result = self.bakeAO(mesh, mesh_full_name + "_shadow.png", self.auto_levels.getValue())
+                data_print.append([mesh_name + "_shadow", result, time.time() - t])
 
-def applyUV(*args):
-    pm.polyAutoProjection(lm=0, pb=0, ibd=1, cm=0, l=2, sc=1, o=1, p=6, ps=.2, ws=0)
+        print "RESULT"
+        data_print.sort(key=lambda x: x[1])
+        for d in data_print:
+            print d[0], "skipped" if d[1] else "done", d[2]
+        print "END RESULT"
 
+    def renderMaterial(self, *args):
 
-def multiImport(*args):
-    for f in pm.fileDialog2(ff="*.obj", fm=4):
-        cmds.file(f, i=True)
+        self.settings()
+        textures_dir = self.out_folder.getText()
+        selected = pm.selected(type="transform") or getMeshes()
+        selected.sort(key=lambda x: x.name())
+        mat_list = self.findNames()
+        print mat_list
+        for mesh in selected:
+            mesh_name = mesh.name()
+            mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+            mesh_full_dir = os.path.join(textures_dir, mesh_name)
+            if not os.path.exists(mesh_full_dir):
+                os.makedirs(mesh_full_dir)
 
-
-def getMeshes():
-    return [x for x in pm.ls(type="transform") if x.listRelatives(type="mesh")]
-
-
-def checkNames(*args):
-
-    for mesh in getMeshes():
-        for letter in mesh.name():
-            try:
-                assert letter in allowed_symbols
-            except AssertionError:
-                pm.warning("incorrect name: %s, character: '%s'" % (mesh.name(), letter))
-
-
-def preferences(*args):
-    pm.select(args)
-    pm.mel.eval("AttributeEditor;")
+            self.bakeMaterials(mat_list, mesh_full_name)
 
 
-def ui():
-
-    if pm.window("Baker", ex=True):
-        pm.deleteUI("Baker")
-
-    win = pm.window("Baker", wh=(200, 400), tlb=True, t="redshift baker")
-    pm.columnLayout()
-
-    pm.text("material name pattern", w=200)
-    pm.textField("baker_pattern", tx=name_pattern, w=200)
-
-    pm.text("material directory", w=200)
-    pm.textField("baker_mat_dir", tx=material_dir, w=200)
-
-    pm.text("output directory", w=200)
-    pm.textField("baker_out_dir", tx=textures_dir, w=200)
-
-    pm.intSliderGrp("baker_size", cw3=[50, 50, 100], ct3=["left", "left", "lfet"], l="size", field=True, v=size,
-                    max=8192)
-    pm.button(l="import meshes", c=multiImport, w=200)
-    pm.button(l="check names", c=checkNames, w=200)
-    pm.button("baker_uv", l="uv", w=200, c=applyUV)
-    pm.button("render settings", w=200, c=lambda *args: preferences("redshiftOptions"))
-    pm.button("shader settings", w=200, c=lambda *args: preferences("ao_texture_rs", "ao_material_rs"))
-    # pm.button("shadow settings", w=200, c=lambda *args: preferences("shadow_material_rs"))
-
-    pm.text(l="bake", w=200)
-
-    pm.optionMenu("baker_export", w=200)
-    pm.menuItem(label='obj')
-    pm.menuItem(label='fbx')
-    pm.menuItem(label='dae')
-    pm.button(l="bake id and mesh", w=200, c=renderID)
-    pm.checkBox("baker_ignore_existing", l="ignore existence", v=True)
-    pm.checkBox("baker_auto", l="auto levels", v=True)
-    pm.button(l="bake light", w=200, c=renderAO)
-    pm.button(l="bake material", w=200, c=renderMaterial)
-    pm.text(l="materials", w=200)
-    for color in materials:
-        pm.button(l=color, w=200, c=functools.partial(applyMaterial, color))
-
-    settings()
-    win.show()
-
-ui()
+Baker()
