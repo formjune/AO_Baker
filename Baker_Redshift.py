@@ -38,6 +38,7 @@ materials = {"default": (128, 128, 128), "red": (255, 0, 0), "green": (0, 255, 0
 allowed_symbols = set(string.ascii_letters + string.digits + "_")
 multiply_channels = "BaseColor",
 ignore_existing = True
+level_auto = True
 
 
 # not for edit
@@ -76,13 +77,14 @@ def findNames():
 def settings():
     """setup vray before baking"""
 
-    global size, material_dir, textures_dir, redshift_dir, name_pattern, ignore_existing
+    global size, material_dir, textures_dir, redshift_dir, name_pattern, ignore_existing, level_auto
     size = pm.intSliderGrp("baker_size", q=True, v=True)
     material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
     textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
     redshift_dir = os.path.join(pm.workspace(fn=True), "images")
     name_pattern = pm.textField("baker_pattern", tx=True, q=True)
     ignore_existing = pm.checkBox("baker_ignore_existing", q=True, v=True)
+    level_auto = pm.checkBox("baker_auto", q=True, v=True)
 
     if not pm.objExists("redshiftOptions"):
         pm.createNode("RedshiftOptions", n="redshiftOptions")
@@ -98,12 +100,12 @@ def settings():
         material = pm.createNode("RedshiftMaterial", n="ao_material_rs")
         # material.setAttr("emission_weight", 1)
         texture = pm.createNode("RedshiftAmbientOcclusion", n="ao_texture_rs")
-        texture.connectAttr("outColor", material.attr("color"))
+        texture.connectAttr("outColor", material.attr("diffuse_color"))
         # texture.connectAttr("outColor", material.attr("emission_color"))
 
-    if not pm.objExists("shadow_material_rs"):
-        material = pm.createNode("RedshiftMaterial", n="shadow_material_rs")
-        material.setAttr("diffuse_color", (1, 1, 1))
+    # if not pm.objExists("shadow_material_rs"):
+    #     material = pm.createNode("RedshiftMaterial", n="shadow_material_rs")
+    #     material.setAttr("diffuse_color", (1, 1, 1))
 
 
 def bakeID(mesh, obj_name):
@@ -163,7 +165,16 @@ def bake(mesh, mesh_name):
             open(mesh_name, "wb").write(open(old_name, "rb").read())
         else:
             os.rename(old_name, mesh_name)
-        # open(mesh_name, "wb").write(open(old_name, "rb").read())
+
+        if level_auto:
+            array = cv2.imread(mesh_name)
+            ar = array.flatten()
+            min_v = min(ar)
+            max_v = max(ar)
+            array = (array - min_v) * 255. / (max_v - min_v)
+            array = array.astype(np.uint8)
+            cv2.imwrite(mesh_name, array)
+
         return 2
     except IndexError:
         return 0
@@ -361,8 +372,8 @@ def ui():
     pm.button(l="check names", c=checkNames, w=200)
     pm.button("baker_uv", l="uv", w=200, c=applyUV)
     pm.button("render settings", w=200, c=lambda *args: preferences("redshiftOptions"))
-    pm.button("ao settings", w=200, c=lambda *args: preferences("ao_texture_rs", "ao_material_rs"))
-    pm.button("shadow settings", w=200, c=lambda *args: preferences("shadow_material_rs"))
+    pm.button("shader settings", w=200, c=lambda *args: preferences("ao_texture_rs", "ao_material_rs"))
+    # pm.button("shadow settings", w=200, c=lambda *args: preferences("shadow_material_rs"))
 
     pm.text(l="bake", w=200)
 
@@ -372,8 +383,8 @@ def ui():
     pm.menuItem(label='dae')
     pm.button(l="bake id and mesh", w=200, c=renderID)
     pm.checkBox("baker_ignore_existing", l="ignore existence", v=True)
-    # pm.checkBox("baker_shadow", l="bake shadow", v=True)
-    pm.button(l="bake ao and shadow", w=200, c=renderAO)
+    pm.checkBox("baker_auto", l="auto levels", v=True)
+    pm.button(l="bake light", w=200, c=renderAO)
     pm.button(l="bake material", w=200, c=renderMaterial)
     pm.text(l="materials", w=200)
     for color in materials:
