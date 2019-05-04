@@ -2,6 +2,7 @@
 place script, numpy and cv2.pyd into documents/maya/scripts.
 run python code: import Baker_Redshift;reload(Baker_Redshift);
 
+edit Default for setting up default values. They can be change in GUI at anytime
 material_dir = directory with materials to place
 output_dir = directory where all textures will be stored
 name_pattern = pattern for material textures recognition
