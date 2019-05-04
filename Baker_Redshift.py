@@ -37,6 +37,7 @@ size = 1024
 materials = {"default": (128, 128, 128), "red": (255, 0, 0), "green": (0, 255, 0), "blue": (0, 0, 255)}
 allowed_symbols = set(string.ascii_letters + string.digits + "_")
 multiply_channels = "BaseColor",
+ignore_existing = True
 
 
 # not for edit
@@ -75,12 +76,13 @@ def findNames():
 def settings():
     """setup vray before baking"""
 
-    global size, material_dir, textures_dir, redshift_dir, name_pattern
+    global size, material_dir, textures_dir, redshift_dir, name_pattern, ignore_existing
     size = pm.intSliderGrp("baker_size", q=True, v=True)
     material_dir = pm.textField("baker_mat_dir", q=True, tx=True)
     textures_dir = pm.textField("baker_out_dir", tx=True, q=True)
     redshift_dir = os.path.join(pm.workspace(fn=True), "images")
     name_pattern = pm.textField("baker_pattern", tx=True, q=True)
+    ignore_existing = pm.checkBox("baker_ignore_existing", q=True, v=True)
 
     if not pm.objExists("redshiftOptions"):
         pm.createNode("RedshiftOptions", n="redshiftOptions")
@@ -157,7 +159,10 @@ def bake(mesh, mesh_name):
     pm.rsRender(bake=True)
     try:
         old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
-        os.rename(old_name, mesh_name)
+        if ignore_existing:
+            open(mesh_name, "wb").write(open(old_name, "rb").read())
+        else:
+            os.rename(old_name, mesh_name)
         # open(mesh_name, "wb").write(open(old_name, "rb").read())
         return 2
     except IndexError:
@@ -189,14 +194,14 @@ def bakeMaterials(mat_list, mesh_name):
 
         # multiply
         if channel in multiply_channels:
-            ao_mask = cv2.imread(mesh_name + "_ao.png")
-            shadow_mask = cv2.imread(mesh_name + "_shadow.png")
-            if ao_mask is not None and shadow_mask is not None:
+            ao_mask = cv2.imread(mesh_name + "_light.png")
+            # shadow_mask = cv2.imread(mesh_name + "_shadow.png")
+            if ao_mask is not None:
                 ao_mask = cv2.resize(ao_mask, (size, size))
-                shadow_mask = cv2.resize(shadow_mask, (size, size))
+                # shadow_mask = cv2.resize(shadow_mask, (size, size))
                 ao_mask = cv2.cvtColor(cv2.cvtColor(ao_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
-                shadow_mask = cv2.cvtColor(cv2.cvtColor(shadow_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
-                channel_map = (channel_map * ao_mask * shadow_mask).astype(np.uint8)
+                # shadow_mask = cv2.cvtColor(cv2.cvtColor(shadow_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
+                channel_map = (channel_map * ao_mask).astype(np.uint8)
 
         cv2.imwrite("%s_mat_%s.png" % (mesh_name, channel), channel_map)
 
@@ -366,8 +371,8 @@ def ui():
     pm.menuItem(label='fbx')
     pm.menuItem(label='dae')
     pm.button(l="bake id and mesh", w=200, c=renderID)
-    pm.checkBox("baker_ao", l="bake ao", v=True)
-    pm.checkBox("baker_shadow", l="bake shadow", v=True)
+    pm.checkBox("baker_ignore_existing", l="ignore existence", v=True)
+    # pm.checkBox("baker_shadow", l="bake shadow", v=True)
     pm.button(l="bake ao and shadow", w=200, c=renderAO)
     pm.button(l="bake material", w=200, c=renderMaterial)
     pm.text(l="materials", w=200)
