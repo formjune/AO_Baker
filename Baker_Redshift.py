@@ -153,7 +153,7 @@ def bake(mesh, mesh_name):
         else:
             shutil.rmtree(name)
 
-    if os.path.exists(mesh_name):
+    if os.path.exists(mesh_name) and not ignore_existing:
         return 1
     pm.select(mesh)
     pm.rsRender(bake=True)
