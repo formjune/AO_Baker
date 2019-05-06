@@ -55,6 +55,7 @@ def settings():
     pm.optionVar(intValue=("vrayAssignBakedTextures", 0))
     pm.optionVar(stringValue=("vrayBakeOutputPath", textures_dir))
     pm.optionVar(intValue=("vrayBakeType", 2))
+
     try:
         options = nt.VRayBakeOptions("vrayDefaultBakeOptions")
     except pm.MayaNodeError:

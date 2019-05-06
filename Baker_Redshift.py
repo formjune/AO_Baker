@@ -240,6 +240,7 @@ class Baker(object):
 
         pm.select(mesh)
         pm.rsRender(bake=True)
+        # raise IndexError in case of render error or pressing escape
         old_name = os.path.join(redshift_dir, os.listdir(redshift_dir)[0])
         open(mesh_name, "wb").write(open(old_name, "rb").read())
 
@@ -345,19 +346,22 @@ class Baker(object):
             if not os.path.exists(mesh_full_dir):
                 os.makedirs(mesh_full_dir)
 
-            if self.ao.getValue():
-                t = time.time()
-                pm.select(mesh)
-                pm.hyperShade(a="ao_material")
-                result = self.bakeAO(mesh, mesh_full_name + "_ao.png")
-                data_print.append([mesh_name + "_ao", result, time.time() - t])
+            try:
+                if self.ao.getValue():
+                    t = time.time()
+                    pm.select(mesh)
+                    pm.hyperShade(a="ao_material")
+                    result = self.bakeAO(mesh, mesh_full_name + "_ao.png")
+                    data_print.append([mesh_name + "_ao", result, time.time() - t])
 
-            if self.shadow.getValue():
-                t = time.time()
-                pm.select(selected)
-                pm.hyperShade(a="shadow_material")
-                result = self.bakeAO(mesh, mesh_full_name + "_shadow.png", self.auto_levels.getValue())
-                data_print.append([mesh_name + "_shadow", result, time.time() - t])
+                if self.shadow.getValue():
+                    t = time.time()
+                    pm.select(selected)
+                    pm.hyperShade(a="shadow_material")
+                    result = self.bakeAO(mesh, mesh_full_name + "_shadow.png", self.auto_levels.getValue())
+                    data_print.append([mesh_name + "_shadow", result, time.time() - t])
+            except IndexError:
+                break
 
         print "RESULT"
         data_print.sort(key=lambda x: x[1])
