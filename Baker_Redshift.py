@@ -239,6 +239,8 @@ class Baker(object):
         if not os.path.isdir(redshift_dir):
             os.makedirs(redshift_dir)
 
+        open(mesh_name, "w").close()    # claim file
+
         for name in os.listdir(redshift_dir):
             name = os.path.join(redshift_dir, name)
             if os.path.isfile(name):
@@ -268,7 +270,7 @@ class Baker(object):
 
     def bakeMaterials(self, mat_list, mesh_name):
         """create material maps based on id"""
-        print 1
+
         mask_map = cv2.imread(mesh_name + "_id.png")
         if mask_map is None:
             self.out_field.append("skipped: " + mesh_name)
