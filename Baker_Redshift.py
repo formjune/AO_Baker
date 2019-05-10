@@ -98,7 +98,7 @@ class Baker(object):
 
         if pm.window("Baker", ex=True):
             pm.deleteUI("Baker")
-        win = pm.window("Baker", wh=(620, 540), tlb=True, t="redshift baker")
+        win = pm.window("Baker", wh=(620, 580), tlb=True, t="redshift baker")
         pm.rowLayout(w=420, nc=2, cw=((1, 200), (2, 400)))
 
         pm.columnLayout(w=200)
@@ -118,6 +118,7 @@ class Baker(object):
         pm.button(label="AO shader settings", w=200,
                   c=lambda *args: preferences("ao_texture", "ao_material"))
         pm.button(label="shadow shader settings", w=200, c=lambda *args: preferences("shadow_material"))
+        pm.button(label="remove empty png", w=200, c=self.cleanEmptyFiles)
         self.format = pm.optionMenu(w=200)
         pm.menuItem(label='obj')
         pm.menuItem(label='fbx')
@@ -231,6 +232,18 @@ class Baker(object):
             uvSet="map1"
         )
         pm.delete(mesh_2)
+
+    def cleanEmptyFiles(self, *args):
+        for folder, subfolders, subfiles in os.walk(self.out_folder):
+            for f in subfiles:
+                name = os.path.join(folder, f)
+                if os.path.splitext(name)[1] != ".png":
+                    continue
+                if not os.path.isfile(name):
+                    continue
+
+                if not os.path.getsize(name):
+                    os.remove(name)
 
     def bakeAO(self, mesh, mesh_name, autolevel=False):
         """bake 0 - id, 1 - ao, 2 - shadows"""
