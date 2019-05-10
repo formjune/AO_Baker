@@ -234,7 +234,7 @@ class Baker(object):
         pm.delete(mesh_2)
 
     def cleanEmptyFiles(self, *args):
-        for folder, subfolders, subfiles in os.walk(self.out_folder):
+        for folder, subfolders, subfiles in os.walk(self.out_folder.getText()):
             for f in subfiles:
                 name = os.path.join(folder, f)
                 if os.path.splitext(name)[1] != ".png":
