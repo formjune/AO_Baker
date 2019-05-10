@@ -22,6 +22,7 @@ import pymel.core.nodetypes as nt
 import shutil
 import string
 import time
+from PySide2.QtGui import *
 
 
 class Default(object):
@@ -97,8 +98,10 @@ class Baker(object):
 
         if pm.window("Baker", ex=True):
             pm.deleteUI("Baker")
-        win = pm.window("Baker", wh=(200, 540), tlb=True, t="redshift baker")
-        pm.columnLayout()
+        win = pm.window("Baker", wh=(620, 540), tlb=True, t="redshift baker")
+        pm.rowLayout(w=420, nc=2, cw=((1, 200), (2, 400)))
+
+        pm.columnLayout(w=200)
 
         pm.text(label="material directory", w=200)
         self.mat_folder = pm.textField(tx=Default.material_dir, w=200)
@@ -133,6 +136,14 @@ class Baker(object):
         for color in Default.materials:
             pm.button(label=color, w=200, c=functools.partial(applyMaterial, color))
 
+        pm.setParent(u=True)
+
+        column = pm.columnLayout(w=400)
+        self.progress = pm.progressBar(w=400)
+        self.out_field = QTextEdit()
+        self.out_field.setFixedSize(400, 500)
+        self.out_field.setObjectName("baker_out")
+        pm.control("baker_out", e=True, p=column)
         self.settings()
         win.show()
 
@@ -236,7 +247,7 @@ class Baker(object):
                 shutil.rmtree(name)
 
         if os.path.exists(mesh_name) and not self.ignore_exist.getValue():
-            return 1
+            return "skipped"
 
         pm.select(mesh)
         pm.rsRender(bake=True)
@@ -253,13 +264,14 @@ class Baker(object):
             array = array.astype(np.uint8)
             cv2.imwrite(mesh_name, array)
 
-        return 0
+        return "done"
 
     def bakeMaterials(self, mat_list, mesh_name):
         """create material maps based on id"""
-
+        print 1
         mask_map = cv2.imread(mesh_name + "_id.png")
         if mask_map is None:
+            self.out_field.append("skipped: " + mesh_name)
             pm.warning(mesh_name + " id map doesn't exists")
             return
 
@@ -278,19 +290,23 @@ class Baker(object):
                 channel_map |= cv2.bitwise_or(image_file, image_file, mask=color_mask)
 
             # multiply
+            text = "done: %s, %s " % (os.path.split(mesh_name)[1], channel)
             if channel in Default.multiply_channels:
                 ao_mask = cv2.imread(mesh_name + "_ao.png")
                 if ao_mask is not None:
                     ao_mask = cv2.resize(ao_mask, (size, size))
                     ao_mask = cv2.cvtColor(cv2.cvtColor(ao_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
                     channel_map *= ao_mask
+                    text += "AO "
 
                 shadow_mask = cv2.imread(mesh_name + "_shadow.png")
                 if shadow_mask is not None:
                     shadow_mask = cv2.resize(shadow_mask, (size, size))
                     shadow_mask = cv2.cvtColor(cv2.cvtColor(shadow_mask, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR) / 255.
                     channel_map *= shadow_mask
+                    text += "SHADOW"
 
+            self.out_field.append(text)
             cv2.imwrite("%s_mat_%s.png" % (mesh_name, channel), channel_map.astype(np.uint8))
 
     def renderObj(self, mesh, mesh_full_name):
@@ -317,6 +333,9 @@ class Baker(object):
             pm.select(selected)
             applyMaterial("default")
         textures_dir = self.out_folder.getText()
+        self.progress.setMaxValue(len(selected))
+        self.progress.setProgress(0)
+        self.out_field.setPlainText("")
 
         for mesh in selected:
             mesh_name = mesh.name()
@@ -328,6 +347,9 @@ class Baker(object):
 
             self.bakeID(mesh, mesh_full_name + "_id")
             self.renderObj(mesh, mesh_full_name)
+            self.out_field.append("done, " + mesh_name)
+            self.progress.step(1)
+        self.progress.setProgress(0)
 
     def renderAO(self, *args):
         """AO and SHADOW"""
@@ -335,8 +357,10 @@ class Baker(object):
         self.settings()
         selected = pm.selected(type="transform") or getMeshes()
         selected.sort(key=lambda x: x.name())
-        data_print = []
         textures_dir = self.out_folder.getText()
+        self.progress.setMaxValue(len(selected))
+        self.progress.setProgress(0)
+        self.out_field.setPlainText("")
 
         for mesh in selected:
 
@@ -352,22 +376,20 @@ class Baker(object):
                     pm.select(mesh)
                     pm.hyperShade(a="ao_material")
                     result = self.bakeAO(mesh, mesh_full_name + "_ao.png")
-                    data_print.append([mesh_name + "_ao", result, time.time() - t])
+                    self.out_field.append("%s: %s_ao, %s" % (result, mesh_name, time.time() - t))
 
                 if self.shadow.getValue():
                     t = time.time()
                     pm.select(selected)
                     pm.hyperShade(a="shadow_material")
                     result = self.bakeAO(mesh, mesh_full_name + "_shadow.png", self.auto_levels.getValue())
-                    data_print.append([mesh_name + "_shadow", result, time.time() - t])
-            except IndexError:
-                break
+                    self.out_field.append("%s: %s_shadow, %s" % (result, mesh_name, time.time() - t))
 
-        print "RESULT"
-        data_print.sort(key=lambda x: x[1])
-        for d in data_print:
-            print d[0], "skipped" if d[1] else "done", d[2]
-        print "END RESULT"
+            except IndexError:
+                self.out.field("render was forcefully stopped")
+                break
+            self.progress.step(1)
+        self.progress.setProgress(0)
 
     def renderMaterial(self, *args):
 
@@ -376,7 +398,10 @@ class Baker(object):
         selected = pm.selected(type="transform") or getMeshes()
         selected.sort(key=lambda x: x.name())
         mat_list = self.findNames()
-        print mat_list
+        self.progress.setMaxValue(len(selected))
+        self.progress.setProgress(0)
+        self.out_field.setPlainText("")
+
         for mesh in selected:
             mesh_name = mesh.name()
             mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
@@ -385,6 +410,7 @@ class Baker(object):
                 os.makedirs(mesh_full_dir)
 
             self.bakeMaterials(mat_list, mesh_full_name)
-
+            self.progress.step(1)
+        self.progress.setProgress(0)
 
 Baker()
