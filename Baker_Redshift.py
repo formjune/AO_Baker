@@ -252,8 +252,6 @@ class Baker(object):
         if not os.path.isdir(redshift_dir):
             os.makedirs(redshift_dir)
 
-        open(mesh_name, "w").close()    # claim file
-
         for name in os.listdir(redshift_dir):
             name = os.path.join(redshift_dir, name)
             if os.path.isfile(name):
@@ -263,6 +261,7 @@ class Baker(object):
 
         if os.path.exists(mesh_name) and not self.ignore_exist.getValue():
             return "skipped"
+        open(mesh_name, "w").close()    # claim file
 
         pm.select(mesh)
         pm.rsRender(bake=True)
@@ -278,6 +277,12 @@ class Baker(object):
             array = (array - min_v) * 255. / (max_v - min_v)
             array = array.astype(np.uint8)
             cv2.imwrite(mesh_name, array)
+
+        if "_ao.png" in mesh_name:
+            matrix = cv2.imread(mesh_name)
+            matrix = cv2.cvtColor(matrix, cv2.COLOR_BGR2GRAY)
+            cv2.imwrite(matrix)
+            print "converted to gray"
 
         return "done"
 
