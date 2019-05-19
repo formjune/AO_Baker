@@ -31,7 +31,7 @@ def proceedVideo(square_size, video_name, result_file):
 
         # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         max_h, max_w, colors = frame.shape
-        result.write("%i" % f)
+        result.write("%i," % f)
 
         for w in range(0, max_w, square_size):
             for h in range(0, max_h, square_size):
