@@ -1,28 +1,18 @@
-"""required version of python 3.7
+"""required version of python 3.7, numpy, cv2, PyQT5
+pip install numpy PyQt5 opencv-python
+
 input field - field referring to video file (avi or mp4)
 output filed - empty (input_name + ".csv"), file or directory
 chunk size - size of square to proceed. chunk numeration direction from left to right, from top to bottom of frame"""
-
-
-#
-# for module_name in "pip", "numpy", "PyQt5", "opencv-python":
-#     pip._main(["install", module_name])
 
 
 import sys
 import os
 import itertools
 import math
-try:
-    import cv2
-    from PyQt5.QtWidgets import *
-except ImportError:
-    import pip.__main__ as pip
-    for module_name in "pip", "numpy", "PyQt5", "opencv-python":
-        pip._main(["install", module_name])
-    import cv2
-    from PyQt5.QtWidgets import *
-    
+import cv2
+from PyQt5.QtWidgets import *
+
 
 def sorting(value):
     return .07 * int(value[0]) + .72 * int(value[1]) + .21 * int(value[2])
@@ -44,7 +34,6 @@ def proceedVideo(square_size, video_name, result_file):
         if not ret:
             break
 
-        # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         result.write("%i" % f)
 
         for w in range(0, max_w, square_size):
