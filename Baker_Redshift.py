@@ -281,7 +281,7 @@ class Baker(object):
         if "_ao.png" in mesh_name:
             matrix = cv2.imread(mesh_name)
             matrix = cv2.cvtColor(matrix, cv2.COLOR_BGR2GRAY)
-            cv2.imwrite(matrix)
+            cv2.imwrite(mesh_name, matrix)
             print "converted to gray"
 
         return "done"
