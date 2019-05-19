@@ -4,15 +4,14 @@ output filed - empty (input_name + ".csv"), file or directory
 chunk size - size of square to proceed. chunk numeration direction from left to right, from top to bottom of frame"""
 
 
-# import pip.__main__ as pip
-# for module_name in "pip", "numpy", "PyQt5", "opencv-python":
-#     pip._main(["install", module_name])
+import pip.__main__ as pip
+for module_name in "pip", "numpy", "PyQt5", "opencv-python":
+    pip._main(["install", module_name])
 
 
 import sys
 import os
 import itertools
-import math
 import cv2
 from PyQt5.QtWidgets import *
 
@@ -24,13 +23,6 @@ def sorting(value):
 def proceedVideo(square_size, video_name, result_file):
     video = cv2.VideoCapture(video_name)
     result = open(result_file, "w", encoding="utf-8")
-    result.write("frame")
-    max_w = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
-    max_h = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    chunk_num = math.ceil(max_w * max_h / square_size ** 2)
-    for i in range(chunk_num):
-        result.write(", l_%.2i, r_%.2i, g_%.2i, b_%.2i" % (i, i, i, i))
-    result.write("\n")
 
     for f in itertools.count():
         ret, frame = video.read()
@@ -38,11 +30,14 @@ def proceedVideo(square_size, video_name, result_file):
             break
 
         # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        max_h, max_w, colors = frame.shape
         result.write("%i" % f)
 
         for w in range(0, max_w, square_size):
             for h in range(0, max_h, square_size):
                 frame_piece = frame[h:h + square_size, w:w + square_size]
+                if colors == 1:     # gray picture
+                    frame_piece = cv2.cvtColor(frame_piece, cv2.COLOR_GRAY2BGR)
 
                 frame_plain = frame_piece.reshape((-1, 3))
                 pixel = max(frame_plain, key=sorting)
