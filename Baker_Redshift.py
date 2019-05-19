@@ -282,7 +282,6 @@ class Baker(object):
             matrix = cv2.imread(mesh_name)
             matrix = cv2.cvtColor(matrix, cv2.COLOR_BGR2GRAY)
             cv2.imwrite(mesh_name, matrix)
-            print "converted to gray"
 
         return "done"
 

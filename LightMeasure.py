@@ -31,8 +31,7 @@ def proceedVideo(square_size, video_name, result_file):
 
         # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         max_h, max_w, colors = frame.shape
-        i = 0
-        result.write("#%i(int)" % f)
+        result.write("%i" % f)
 
         for w in range(0, max_w, square_size):
             for h in range(0, max_h, square_size):
@@ -41,12 +40,11 @@ def proceedVideo(square_size, video_name, result_file):
                     frame_piece = cv2.cvtColor(frame_piece, cv2.COLOR_GRAY2BGR)
 
                 frame_plain = frame_piece.reshape((-1, 3))
-                b, g, r = max(frame_plain, key=sorting)
-                result.write(", Lamp_%i_int(float((0.21 × %i) + (0.72 × %i) + (0.07 × %i)))" % (i, r, g, b))
-                #result.write(", Lamp_%i_R(float (0.0..%i.0))" % (i, r))
-                #result.write(", Lamp_%i_G(float (0.0..%i.0))" % (i, g))
-                #result.write(", Lamp_%i_B(float (0.0..%i.0))" % (i, b))
-                i += 1
+                pixel = max(frame_plain, key=sorting)
+                gray = sorting(pixel)
+                b, g, r = pixel
+                result.write(" %i %i %i %i" % (gray, r, g, b))
+
         result.write("\n")
 
 
