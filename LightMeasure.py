@@ -21,12 +21,12 @@ def sorting(value):
 def proceedVideo(square_size, video_name, result_file):
     video = cv2.VideoCapture(video_name)
     result = open(result_file, "w", encoding="utf-8")
-    result.write("frame")
+    result.write("---, frame")
     max_w = int(video.get(cv2.CAP_PROP_FRAME_WIDTH))
     max_h = int(video.get(cv2.CAP_PROP_FRAME_HEIGHT))
     chunk_num = math.ceil(max_w * max_h / square_size ** 2)
     for i in range(chunk_num):
-        result.write(", l_%.2i, r_%.2i, g_%.2i, b_%.2i" % (i, i, i, i))
+        result.write(",l_%.2i,r_%.2i,g_%.2i,b_%.2i" % (i, i, i, i))
     result.write("\n")
 
     for f in itertools.count():
@@ -34,7 +34,7 @@ def proceedVideo(square_size, video_name, result_file):
         if not ret:
             break
 
-        result.write("%i" % f)
+        result.write('%i,"%i"' % (f, f))
 
         for w in range(0, max_w, square_size):
             for h in range(0, max_h, square_size):
@@ -44,7 +44,7 @@ def proceedVideo(square_size, video_name, result_file):
                 pixel = max(frame_plain, key=sorting)
                 gray = sorting(pixel)
                 b, g, r = pixel
-                result.write(", %i, %i, %i, %i" % (gray, r, g, b))
+                result.write(',"%f","%f","%f","%f"' % (gray, r, g, b))
 
         result.write("\n")
 
