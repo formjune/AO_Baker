@@ -4,9 +4,9 @@ output filed - empty (input_name + ".csv"), file or directory
 chunk size - size of square to proceed. chunk numeration direction from left to right, from top to bottom of frame"""
 
 
-import pip.__main__ as pip
-for module_name in "pip", "numpy", "PyQt5", "opencv-python":
-    pip._main(["install", module_name])
+# import pip.__main__ as pip
+# for module_name in "pip", "numpy", "PyQt5", "opencv-python":
+#     pip._main(["install", module_name])
 
 
 import sys
