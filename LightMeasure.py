@@ -114,9 +114,9 @@ class MainWindow(QMainWindow):
 
         out_file = self.output_field.text()
         if not out_file:
-            out_file = os.path.splitext(in_file)[0] + ".txt"
+            out_file = os.path.splitext(in_file)[0] + ".csv"
         elif os.path.isdir(out_file):
-            out_file = os.path.join(out_file, os.path.splitext(in_file)[0] + ".txt")
+            out_file = os.path.join(out_file, os.path.splitext(in_file)[0] + ".csv")
 
         print("out file: " + out_file)
         try:
