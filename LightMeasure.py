@@ -43,7 +43,7 @@ def proceedVideo(square_size, video_name, result_file):
                 pixel = max(frame_plain, key=sorting)
                 gray = sorting(pixel)
                 b, g, r = pixel
-                result.write(" %i %i %i %i" % (gray, r, g, b))
+                result.write(" %i, %i, %i, %i," % (gray, r, g, b))
 
         result.write("\n")
 
