@@ -22,7 +22,7 @@ import pymel.core.nodetypes as nt
 import shutil
 import string
 import time
-from PySide2.QtGui import QTextEdit
+from PySide2.QtWidgets import *
 
 
 class Default(object):
