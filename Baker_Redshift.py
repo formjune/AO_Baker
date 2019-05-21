@@ -334,7 +334,7 @@ class Baker(object):
         pm.select(mesh)
         if export == "obj":
             pm.cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
-                         options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
+                         options='groups=1;ptgroups=1;materials=1;smoothing=1;normals=1')
         elif export == "fbx":
             pm.mel.FBXExport(f=mesh_full_name.replace("\\", "/") + ".fbx", s=True)
         else:
