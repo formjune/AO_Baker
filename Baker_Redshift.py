@@ -129,7 +129,8 @@ class Baker(object):
         self.shadow = pm.checkBox(label="bake shadows", v=True)
         self.ao = pm.checkBox(label="bake ambient occlusion", v=True)
 
-        pm.button(label="bake id and mesh", w=200, c=self.renderID)
+        pm.button(label="bake id", w=200, c=self.renderID)
+        pm.button(label="bake mesh", w=200, c=self.renderMesh)
         pm.button(label="bake AO and shadow", w=200, c=self.renderAO)
         pm.button(label="create material", w=200, c=self.renderMaterial)
 
@@ -189,7 +190,7 @@ class Baker(object):
 
         sample = self.pattern.getText()
         path = self.mat_folder.getText()
-        print path, sample
+        print(path, sample)
         split_sample = os.path.splitext(sample)[0].split("_")
         name_id = split_sample.index("%material") if "%material" in split_sample else -1
         channel_id = split_sample.index("%channel") if "%channel" in split_sample else -1
@@ -331,7 +332,6 @@ class Baker(object):
     def renderObj(self, mesh, mesh_full_name):
         export = self.format.getValue()
         pm.select(mesh)
-        applyMaterial("default")
         if export == "obj":
             pm.cmds.file(mesh_full_name + ".obj", force=True, type='OBJexport', es=True,
                          options='groups=1;ptgroups=1;materials=0;smoothing=1;normals=1')
@@ -365,6 +365,29 @@ class Baker(object):
                 os.makedirs(mesh_full_dir)
 
             self.bakeID(mesh, mesh_full_name + "_id")
+            self.out_field.append("done, " + mesh_name)
+            self.progress.step(1)
+        self.progress.setProgress(0)
+
+    def renderMesh(self, *args):
+        """ID and save obj"""
+
+        self.settings()
+        selected = pm.selected(type="transform") or getMeshes()
+        selected.sort(key=lambda x: x.name())
+        textures_dir = self.out_folder.getText()
+        self.progress.setMaxValue(len(selected))
+        self.progress.setProgress(0)
+        self.out_field.setPlainText("")
+
+        for mesh in selected:
+            mesh_name = mesh.name()
+            mesh_full_name = os.path.join(textures_dir, mesh_name, mesh_name)
+            mesh_full_dir = os.path.join(textures_dir, mesh_name)
+
+            if not os.path.exists(mesh_full_dir):
+                os.makedirs(mesh_full_dir)
+
             self.renderObj(mesh, mesh_full_name)
             self.out_field.append("done, " + mesh_name)
             self.progress.step(1)
